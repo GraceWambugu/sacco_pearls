@@ -1,9 +1,10 @@
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from .database import Base, engine
-from .routers import auth, metrics, saccos, users, watchlists
+from .routers import auth, ingest, metrics, saccos, users, watchlists
 
 
 @asynccontextmanager
@@ -19,11 +20,23 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Allows the admin.html panel (opened as a local file, or from any dev origin)
+# to call this API from the browser. Fine for a student prototype; a deployed
+# production system would instead list only its real frontend's exact origin.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(saccos.router)
 app.include_router(metrics.router)
 app.include_router(watchlists.router)
+app.include_router(ingest.router)
 
 
 @app.get("/", tags=["Health"])
