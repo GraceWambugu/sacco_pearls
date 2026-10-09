@@ -200,3 +200,91 @@ def test_normalize_name_matches_report_spellings():
     assert normalize_name("STIMA DT.") == normalize_name("STIMA DT") == normalize_name("Stima DT-SACCO")
     assert normalize_name("INVEST & GROW (IG)") == normalize_name("INVEST AND GROW (IG)")
     assert normalize_name("THE KENYA BANKERS") == "KENYA BANKERS"
+
+
+def test_admin_upload_stability_creates_and_updates_metrics(client, monkeypatch):
+    import pandas as pd
+
+    from app.routers import ingest
+
+    def extract(raw, pages, prior_year, current_year):
+        assert raw == b"%PDF-example"
+        assert (pages, prior_year, current_year) == ("174-178", 2023, 2024)
+        return pd.DataFrame([
+            {"sacco_name": "STIMA DT.", "data_year": 2023, "cca": 17.45,
+             "ccd": 23.93, "ica": 11.44, "ext_borrowing": 0.8,
+             "npl_ratio": 3.66, "footnote_star": False},
+            {"sacco_name": "STIMA DT.", "data_year": 2024, "cca": 19.22,
+             "ccd": 27.38, "ica": 12.55, "ext_borrowing": 1.14,
+             "npl_ratio": 6.53, "footnote_star": False},
+        ])
+
+    monkeypatch.setattr(ingest, "extract_stability_table", extract)
+    form = {"pages": "174-178", "report_year": "2024", "prior_year": "2023", "current_year": "2024"}
+    files = {"file": ("report.pdf", b"%PDF-example", "application/pdf")}
+    member = auth_headers(client, "member@example.com")
+    assert client.post("/ingest/stability", data=form, files=files, headers=member).status_code == 403
+
+    admin = admin_headers(client)
+    response = client.post("/ingest/stability", data=form, files=files, headers=admin)
+    assert response.status_code == 200
+    assert response.json()["saccos_created"] == 1
+    assert response.json()["metrics_created"] == 2
+    sacco_id = client.get("/saccos").json()[0]["id"]
+    assert [m["data_year"] for m in client.get(f"/saccos/{sacco_id}/metrics").json()] == [2023, 2024]
+
+    response = client.post("/ingest/stability", data=form, files=files, headers=admin)
+    assert response.status_code == 200
+    assert response.json()["saccos_created"] == 0
+    assert response.json()["metrics_updated"] == 2
+
+
+def test_extraction_temp_pdf_is_reopened_and_removed(monkeypatch):
+    from pathlib import Path
+
+    from app import etl
+
+    paths = []
+
+    def read_pdf(path, **kwargs):
+        paths.append(Path(path))
+        assert Path(path).read_bytes() == b"%PDF-test"
+        if len(paths) == 2:
+            raise ValueError("invalid PDF")
+        return []
+
+    monkeypatch.setattr(etl.camelot, "read_pdf", read_pdf)
+    assert etl.extract_stability_table(b"%PDF-test", "174-178", 2023, 2024).empty
+    assert not paths[0].exists()
+
+    with pytest.raises(ValueError, match="invalid PDF"):
+        etl.extract_stability_table(b"%PDF-test", "174-178", 2023, 2024)
+    assert not paths[1].exists()
+
+
+def test_county_import_only_fills_unique_empty_headquarters(client):
+    from app.models import Sacco
+    from scripts.load_counties import headquarters_county, import_counties
+
+    assert headquarters_county("Kapsowar Town\nELGEYO\nMARAKWET\nCOUNTY") == "Elgeyo Marakwet"
+    assert headquarters_county("MURANG'A\nCOUNTY") == "Murang'a"
+    assert headquarters_county("MARAKWET\nCOUNTY") is None
+
+    entries = [
+        {"number": 1, "name": "STIMA SACCO SOCIETY LIMITED", "page": 184, "county": "Nairobi"},
+        {"number": 2, "name": "AFYA SACCO SOCIETY LIMITED", "page": 184, "county": "Kiambu"},
+        {"number": 3, "name": "ARDHI SACCO SOCIETY LIMITED", "page": 185, "county": "Meru"},
+        {"number": 4, "name": "ARDHI SACCO SOCIETY LIMITED", "page": 186, "county": "Nyeri"},
+    ]
+    with client.Session() as db:
+        db.add_all([Sacco(name="STIMA DT."), Sacco(name="AFYA", county="Nairobi"), Sacco(name="ARDHI")])
+        db.commit()
+        ready, review = import_counties(entries, db)
+        assert [sacco.name for sacco, _ in ready] == ["STIMA DT."]
+        assert len(review) == 3
+        assert db.scalar(select(Sacco).where(Sacco.name == "STIMA DT.")).county is None
+
+        import_counties(entries, db, apply=True)
+        assert db.scalar(select(Sacco).where(Sacco.name == "STIMA DT.")).county == "Nairobi"
+        assert db.scalar(select(Sacco).where(Sacco.name == "AFYA")).county == "Nairobi"
+        assert db.scalar(select(Sacco).where(Sacco.name == "ARDHI")).county is None
