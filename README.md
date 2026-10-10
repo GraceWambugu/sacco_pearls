@@ -16,6 +16,16 @@ Mobile SACCO membership decision system using PEARLS-based benchmarking.
     python -m scripts.create_admin you@example.com "YourPass1" "Your Name"
     python -m scripts.load_stability ../data/processed/stability_2024_report.csv --report-year 2024 --source sasra_2024.pdf --page 174
 
+## Forgotten password (local account recovery)
+From `backend`, using the same environment and database as the running API:
+
+    python -m scripts.reset_password
+
+Enter the existing account email, then enter and confirm a new password at the
+hidden prompts. Passwords must contain at least 8 characters, a letter and a digit.
+This preserves the account role. The create-admin script does not reset passwords
+for existing accounts. This recovery command is for trusted local operators only.
+
 ## Headquarters counties from the 2024 directory
 Appendix VII of the SASRA 2024 PDF lists DT-SACCO headquarters and counties.
 From `backend`, preview unique matches against existing SACCOs before applying:

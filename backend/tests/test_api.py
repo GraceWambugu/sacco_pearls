@@ -104,6 +104,44 @@ def test_cannot_self_register_as_admin(client):
     assert r.json()["role"] == "member"
 
 
+def test_local_password_reset(client, monkeypatch, capsys):
+    from scripts import reset_password
+
+    admin_headers(client, "admin@example.com")
+    monkeypatch.setattr(reset_password, "SessionLocal", client.Session)
+    monkeypatch.setattr("builtins.input", lambda prompt: " ADMIN@example.com ")
+    monkeypatch.setattr(reset_password, "getpass", lambda prompt: "ReplacementPass9")
+    reset_password.main()
+    assert login(client, "admin@example.com", "ReplacementPass9").status_code == 200
+    assert login(client, "admin@example.com", PW).status_code == 401
+    with client.Session() as session:
+        user = session.scalar(select(User).where(User.email == "admin@example.com"))
+        assert user.role == "admin"
+        assert user.password_hash.startswith("$argon2id$")
+    assert "ReplacementPass9" not in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("email,password,confirmation,message", [
+    ("admin@example.com", "ReplacementPass9", "DifferentPass9", "do not match"),
+    ("admin@example.com", "short1", "short1", "at least 8 characters"),
+    ("admin@example.com", "onlyletters", "onlyletters", "letter and one digit"),
+    ("missing@example.com", "ReplacementPass9", "ReplacementPass9", "not found"),
+])
+def test_local_password_reset_rejects_invalid_input(
+        client, monkeypatch, email, password, confirmation, message):
+    from scripts import reset_password
+
+    register(client, "admin@example.com")
+    monkeypatch.setattr(reset_password, "SessionLocal", client.Session)
+    monkeypatch.setattr("builtins.input", lambda prompt: email)
+    passwords = iter([password, confirmation])
+    monkeypatch.setattr(reset_password, "getpass", lambda prompt: next(passwords))
+    with pytest.raises(SystemExit, match=message) as error:
+        reset_password.main()
+    assert password not in str(error.value)
+    assert login(client, "admin@example.com", PW).status_code == 200
+
+
 # ---------- users CRUD ----------
 def test_user_read_update_delete(client):
     h = auth_headers(client, "a@example.com")
