@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .database import Base, engine
-from .routers import auth, ingest, metrics, saccos, users, watchlists
+from .routers import auth, ingest, ingest_growth, metrics, saccos, users, watchlists
 
 
 @asynccontextmanager
@@ -37,6 +37,7 @@ app.include_router(saccos.router)
 app.include_router(metrics.router)
 app.include_router(watchlists.router)
 app.include_router(ingest.router)
+app.include_router(ingest_growth.router)
 
 
 @app.get("/", tags=["Health"])

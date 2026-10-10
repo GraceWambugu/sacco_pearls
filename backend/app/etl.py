@@ -7,9 +7,11 @@
 Keeping this in one place means the two code paths can never silently drift
 apart and produce different results from the same PDF.
 """
+import gc
 import os
 import re
 import tempfile
+import time
 import warnings
 
 import camelot
@@ -18,6 +20,20 @@ import pandas as pd
 warnings.filterwarnings("ignore")
 
 METRICS = ["cca", "ccd", "ica", "ext_borrowing", "npl_ratio"]
+
+
+def _remove_temp_file(path, attempts=5, delay=0.3):
+    """Retry locked temporary PDFs without failing an otherwise valid extraction."""
+    for attempt in range(attempts):
+        try:
+            os.remove(path)
+            return
+        except FileNotFoundError:
+            return
+        except PermissionError:
+            if attempt + 1 < attempts:
+                gc.collect()
+                time.sleep(delay)
 
 
 def _pct(x):
@@ -55,7 +71,7 @@ def extract_stability_table(pdf_bytes: bytes, pages: str, y0: int, y1: int) -> p
             tmp.write(pdf_bytes)
         tables = camelot.read_pdf(tmp_path, pages=pages, flavor="lattice")
     finally:
-        os.remove(tmp_path)
+        _remove_temp_file(tmp_path)
 
     rows = []
     for t in tables:
@@ -69,4 +85,63 @@ def extract_stability_table(pdf_bytes: bytes, pages: str, y0: int, y1: int) -> p
                 for i, m in enumerate(METRICS):
                     row[m] = vals[i * 2 + j]
                 rows.append(row)
+    return pd.DataFrame(rows)
+
+
+GROWTH_METRICS = ["total_assets", "total_deposits", "gross_loans", "total_income"]
+
+
+def _num(x):
+    """'66.43' -> 66.43 ; '(4.29)' -> -4.29 (accounting negatives) ; blank/footnote text -> None"""
+    x = re.sub(r"\s+", "", str(x))
+    m = re.fullmatch(r"(\()?(-?\d+(?:\.\d+)?)(\))?", x)
+    if not m:
+        return None
+    v = float(m.group(2))
+    return -v if (m.group(1) and m.group(3)) else v
+
+
+def extract_growth_table(pdf_bytes: bytes, pages: str, y0: int, y1: int) -> pd.DataFrame:
+    """Extract the SASRA 'Growth Performance Indicators for DT-SACCOs' appendix.
+
+    Four metrics in Kshs billions: total assets, deposits, gross loans, income.
+
+    Older reports (e.g. 2020) list only ONE data year in this appendix. That is
+    detected from the table's column count: 6 columns (rank, name, 4 metrics)
+    is single-year and every row gets data_year=y1; 10 columns (4 metrics x
+    2 years) is the normal paired layout. For a single-year report, pass the
+    same value for y0 and y1.
+
+    Returns one row per (SACCO, year): rank_no, sacco_name, footnote_star,
+    data_year, total_assets, total_deposits, gross_loans, total_income.
+    """
+    fd, tmp_path = tempfile.mkstemp(suffix=".pdf")
+    try:
+        with os.fdopen(fd, "wb") as tmp:
+            tmp.write(pdf_bytes)
+        tables = camelot.read_pdf(tmp_path, pages=pages, flavor="lattice")
+    finally:
+        _remove_temp_file(tmp_path)
+
+    n = len(GROWTH_METRICS)
+    rows = []
+    for t in tables:
+        single_year = t.df.shape[1] == 2 + n
+        for _, r in t.df.iterrows():
+            if not re.fullmatch(r"\d{1,3}", str(r[0]).strip()):
+                continue  # skip header / tier-heading / footnote rows
+            name, star = _clean_name(r[1])
+            if single_year:
+                vals = [_num(v) for v in r[2:2 + n]]
+                row = dict(rank_no=int(r[0]), sacco_name=name, footnote_star=star, data_year=y1)
+                for i, m in enumerate(GROWTH_METRICS):
+                    row[m] = vals[i]
+                rows.append(row)
+            else:
+                vals = [_num(v) for v in r[2:2 + n * 2]]
+                for j, y in enumerate((y0, y1)):
+                    row = dict(rank_no=int(r[0]), sacco_name=name, footnote_star=star, data_year=y)
+                    for i, m in enumerate(GROWTH_METRICS):
+                        row[m] = vals[i * 2 + j]
+                    rows.append(row)
     return pd.DataFrame(rows)
