@@ -277,7 +277,8 @@ def test_admin_upload_stability_creates_and_updates_metrics(client, monkeypatch)
     assert response.json()["metrics_updated"] == 2
 
 
-def test_extraction_temp_pdf_is_reopened_and_removed(monkeypatch):
+@pytest.mark.parametrize("extractor", ["extract_stability_table", "extract_growth_table"])
+def test_extraction_temp_pdf_is_reopened_and_removed(monkeypatch, extractor):
     from pathlib import Path
 
     from app import etl
@@ -292,12 +293,76 @@ def test_extraction_temp_pdf_is_reopened_and_removed(monkeypatch):
         return []
 
     monkeypatch.setattr(etl.camelot, "read_pdf", read_pdf)
-    assert etl.extract_stability_table(b"%PDF-test", "174-178", 2023, 2024).empty
+    extract = getattr(etl, extractor)
+    assert extract(b"%PDF-test", "174-178", 2023, 2024).empty
     assert not paths[0].exists()
 
     with pytest.raises(ValueError, match="invalid PDF"):
-        etl.extract_stability_table(b"%PDF-test", "174-178", 2023, 2024)
+        extract(b"%PDF-test", "174-178", 2023, 2024)
     assert not paths[1].exists()
+
+
+@pytest.mark.parametrize("extractor", ["extract_stability_table", "extract_growth_table"])
+@pytest.mark.parametrize("locked_attempts", [2, 5])
+@pytest.mark.parametrize("extraction_fails", [False, True])
+def test_extraction_temp_pdf_tolerates_locks(
+        monkeypatch, tmp_path, extractor, locked_attempts, extraction_fails):
+    import os
+
+    from app import etl
+
+    path = tmp_path / "locked.pdf"
+    removal_attempts = []
+    delays = []
+    original_remove = os.remove
+
+    def mkstemp(**kwargs):
+        return os.open(path, os.O_CREAT | os.O_WRONLY | os.O_TRUNC), str(path)
+
+    def remove(filename):
+        removal_attempts.append(filename)
+        if len(removal_attempts) <= locked_attempts:
+            raise PermissionError("temporary file is locked")
+        original_remove(filename)
+
+    def read_pdf(filename, **kwargs):
+        assert path.read_bytes() == b"%PDF-test"
+        if extraction_fails:
+            raise ValueError("invalid PDF")
+        return []
+
+    monkeypatch.setattr(etl.tempfile, "mkstemp", mkstemp)
+    monkeypatch.setattr(etl.os, "remove", remove)
+    monkeypatch.setattr(etl.time, "sleep", delays.append)
+    monkeypatch.setattr(etl.gc, "collect", lambda: None)
+    monkeypatch.setattr(etl.camelot, "read_pdf", read_pdf)
+    extract = getattr(etl, extractor)
+    try:
+        if extraction_fails:
+            with pytest.raises(ValueError, match="invalid PDF"):
+                extract(b"%PDF-test", "174-178", 2023, 2024)
+        else:
+            assert extract(b"%PDF-test", "174-178", 2023, 2024).empty
+        assert len(removal_attempts) == min(locked_attempts + 1, 5)
+        assert len(delays) == min(locked_attempts, 4)
+        assert path.exists() == (locked_attempts == 5)
+    finally:
+        if path.exists():
+            original_remove(path)
+
+
+def test_extraction_temp_pdf_cleanup_ignores_missing_file(monkeypatch):
+    from app import etl
+
+    def remove(path):
+        raise FileNotFoundError(path)
+
+    def sleep(delay):
+        pytest.fail("Missing files should not trigger a retry")
+
+    monkeypatch.setattr(etl.os, "remove", remove)
+    monkeypatch.setattr(etl.time, "sleep", sleep)
+    etl._remove_temp_file("already-removed.pdf")
 
 
 def test_county_import_only_fills_unique_empty_headquarters(client):
