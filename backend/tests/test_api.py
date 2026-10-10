@@ -104,6 +104,44 @@ def test_cannot_self_register_as_admin(client):
     assert r.json()["role"] == "member"
 
 
+def test_local_password_reset(client, monkeypatch, capsys):
+    from scripts import reset_password
+
+    admin_headers(client, "admin@example.com")
+    monkeypatch.setattr(reset_password, "SessionLocal", client.Session)
+    monkeypatch.setattr("builtins.input", lambda prompt: " ADMIN@example.com ")
+    monkeypatch.setattr(reset_password, "getpass", lambda prompt: "ReplacementPass9")
+    reset_password.main()
+    assert login(client, "admin@example.com", "ReplacementPass9").status_code == 200
+    assert login(client, "admin@example.com", PW).status_code == 401
+    with client.Session() as session:
+        user = session.scalar(select(User).where(User.email == "admin@example.com"))
+        assert user.role == "admin"
+        assert user.password_hash.startswith("$argon2id$")
+    assert "ReplacementPass9" not in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("email,password,confirmation,message", [
+    ("admin@example.com", "ReplacementPass9", "DifferentPass9", "do not match"),
+    ("admin@example.com", "short1", "short1", "at least 8 characters"),
+    ("admin@example.com", "onlyletters", "onlyletters", "letter and one digit"),
+    ("missing@example.com", "ReplacementPass9", "ReplacementPass9", "not found"),
+])
+def test_local_password_reset_rejects_invalid_input(
+        client, monkeypatch, email, password, confirmation, message):
+    from scripts import reset_password
+
+    register(client, "admin@example.com")
+    monkeypatch.setattr(reset_password, "SessionLocal", client.Session)
+    monkeypatch.setattr("builtins.input", lambda prompt: email)
+    passwords = iter([password, confirmation])
+    monkeypatch.setattr(reset_password, "getpass", lambda prompt: next(passwords))
+    with pytest.raises(SystemExit, match=message) as error:
+        reset_password.main()
+    assert password not in str(error.value)
+    assert login(client, "admin@example.com", PW).status_code == 200
+
+
 # ---------- users CRUD ----------
 def test_user_read_update_delete(client):
     h = auth_headers(client, "a@example.com")
@@ -200,3 +238,156 @@ def test_normalize_name_matches_report_spellings():
     assert normalize_name("STIMA DT.") == normalize_name("STIMA DT") == normalize_name("Stima DT-SACCO")
     assert normalize_name("INVEST & GROW (IG)") == normalize_name("INVEST AND GROW (IG)")
     assert normalize_name("THE KENYA BANKERS") == "KENYA BANKERS"
+
+
+def test_admin_upload_stability_creates_and_updates_metrics(client, monkeypatch):
+    import pandas as pd
+
+    from app.routers import ingest
+
+    def extract(raw, pages, prior_year, current_year):
+        assert raw == b"%PDF-example"
+        assert (pages, prior_year, current_year) == ("174-178", 2023, 2024)
+        return pd.DataFrame([
+            {"sacco_name": "STIMA DT.", "data_year": 2023, "cca": 17.45,
+             "ccd": 23.93, "ica": 11.44, "ext_borrowing": 0.8,
+             "npl_ratio": 3.66, "footnote_star": False},
+            {"sacco_name": "STIMA DT.", "data_year": 2024, "cca": 19.22,
+             "ccd": 27.38, "ica": 12.55, "ext_borrowing": 1.14,
+             "npl_ratio": 6.53, "footnote_star": False},
+        ])
+
+    monkeypatch.setattr(ingest, "extract_stability_table", extract)
+    form = {"pages": "174-178", "report_year": "2024", "prior_year": "2023", "current_year": "2024"}
+    files = {"file": ("report.pdf", b"%PDF-example", "application/pdf")}
+    member = auth_headers(client, "member@example.com")
+    assert client.post("/ingest/stability", data=form, files=files, headers=member).status_code == 403
+
+    admin = admin_headers(client)
+    response = client.post("/ingest/stability", data=form, files=files, headers=admin)
+    assert response.status_code == 200
+    assert response.json()["saccos_created"] == 1
+    assert response.json()["metrics_created"] == 2
+    sacco_id = client.get("/saccos").json()[0]["id"]
+    assert [m["data_year"] for m in client.get(f"/saccos/{sacco_id}/metrics").json()] == [2023, 2024]
+
+    response = client.post("/ingest/stability", data=form, files=files, headers=admin)
+    assert response.status_code == 200
+    assert response.json()["saccos_created"] == 0
+    assert response.json()["metrics_updated"] == 2
+
+
+@pytest.mark.parametrize("extractor", ["extract_stability_table", "extract_growth_table"])
+def test_extraction_temp_pdf_is_reopened_and_removed(monkeypatch, extractor):
+    from pathlib import Path
+
+    from app import etl
+
+    paths = []
+
+    def read_pdf(path, **kwargs):
+        paths.append(Path(path))
+        assert Path(path).read_bytes() == b"%PDF-test"
+        if len(paths) == 2:
+            raise ValueError("invalid PDF")
+        return []
+
+    monkeypatch.setattr(etl.camelot, "read_pdf", read_pdf)
+    extract = getattr(etl, extractor)
+    assert extract(b"%PDF-test", "174-178", 2023, 2024).empty
+    assert not paths[0].exists()
+
+    with pytest.raises(ValueError, match="invalid PDF"):
+        extract(b"%PDF-test", "174-178", 2023, 2024)
+    assert not paths[1].exists()
+
+
+@pytest.mark.parametrize("extractor", ["extract_stability_table", "extract_growth_table"])
+@pytest.mark.parametrize("locked_attempts", [2, 5])
+@pytest.mark.parametrize("extraction_fails", [False, True])
+def test_extraction_temp_pdf_tolerates_locks(
+        monkeypatch, tmp_path, extractor, locked_attempts, extraction_fails):
+    import os
+
+    from app import etl
+
+    path = tmp_path / "locked.pdf"
+    removal_attempts = []
+    delays = []
+    original_remove = os.remove
+
+    def mkstemp(**kwargs):
+        return os.open(path, os.O_CREAT | os.O_WRONLY | os.O_TRUNC), str(path)
+
+    def remove(filename):
+        removal_attempts.append(filename)
+        if len(removal_attempts) <= locked_attempts:
+            raise PermissionError("temporary file is locked")
+        original_remove(filename)
+
+    def read_pdf(filename, **kwargs):
+        assert path.read_bytes() == b"%PDF-test"
+        if extraction_fails:
+            raise ValueError("invalid PDF")
+        return []
+
+    monkeypatch.setattr(etl.tempfile, "mkstemp", mkstemp)
+    monkeypatch.setattr(etl.os, "remove", remove)
+    monkeypatch.setattr(etl.time, "sleep", delays.append)
+    monkeypatch.setattr(etl.gc, "collect", lambda: None)
+    monkeypatch.setattr(etl.camelot, "read_pdf", read_pdf)
+    extract = getattr(etl, extractor)
+    try:
+        if extraction_fails:
+            with pytest.raises(ValueError, match="invalid PDF"):
+                extract(b"%PDF-test", "174-178", 2023, 2024)
+        else:
+            assert extract(b"%PDF-test", "174-178", 2023, 2024).empty
+        assert len(removal_attempts) == min(locked_attempts + 1, 5)
+        assert len(delays) == min(locked_attempts, 4)
+        assert path.exists() == (locked_attempts == 5)
+    finally:
+        if path.exists():
+            original_remove(path)
+
+
+def test_extraction_temp_pdf_cleanup_ignores_missing_file(monkeypatch):
+    from app import etl
+
+    def remove(path):
+        raise FileNotFoundError(path)
+
+    def sleep(delay):
+        pytest.fail("Missing files should not trigger a retry")
+
+    monkeypatch.setattr(etl.os, "remove", remove)
+    monkeypatch.setattr(etl.time, "sleep", sleep)
+    etl._remove_temp_file("already-removed.pdf")
+
+
+def test_county_import_only_fills_unique_empty_headquarters(client):
+    from app.models import Sacco
+    from scripts.load_counties import headquarters_county, import_counties
+
+    assert headquarters_county("Kapsowar Town\nELGEYO\nMARAKWET\nCOUNTY") == "Elgeyo Marakwet"
+    assert headquarters_county("MURANG'A\nCOUNTY") == "Murang'a"
+    assert headquarters_county("MARAKWET\nCOUNTY") is None
+
+    entries = [
+        {"number": 1, "name": "STIMA SACCO SOCIETY LIMITED", "page": 184, "county": "Nairobi"},
+        {"number": 2, "name": "AFYA SACCO SOCIETY LIMITED", "page": 184, "county": "Kiambu"},
+        {"number": 3, "name": "ARDHI SACCO SOCIETY LIMITED", "page": 185, "county": "Meru"},
+        {"number": 4, "name": "ARDHI SACCO SOCIETY LIMITED", "page": 186, "county": "Nyeri"},
+    ]
+    with client.Session() as db:
+        db.add_all([Sacco(name="STIMA DT."), Sacco(name="AFYA", county="Nairobi"), Sacco(name="ARDHI")])
+        db.commit()
+        ready, review = import_counties(entries, db)
+        assert [sacco.name for sacco, _ in ready] == ["STIMA DT."]
+        assert len(review) == 3
+        assert db.scalar(select(Sacco).where(Sacco.name == "STIMA DT.")).county is None
+
+        import_counties(entries, db, apply=True)
+        assert db.scalar(select(Sacco).where(Sacco.name == "STIMA DT.")).county == "Nairobi"
+        assert db.scalar(select(Sacco).where(Sacco.name == "AFYA")).county == "Nairobi"
+        assert db.scalar(select(Sacco).where(Sacco.name == "ARDHI")).county is None
