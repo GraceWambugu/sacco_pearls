@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Workspace | SACCO PEARLS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{--ink:#20302b;--paper:#f5f7f5;--line:#dbe1dc;--forest:#235c48;--forest-light:#327259;--red:#ad4539;--muted:#66756e}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);font:14px/1.5 "DM Sans",sans-serif}
+  button,input{font:inherit}button{cursor:pointer}button:disabled{opacity:.55;cursor:wait}
+  .hidden{display:none!important}
+  .shell{min-height:100svh;display:grid;grid-template-columns:230px minmax(0,1fr)}
+  .sidebar{position:sticky;top:0;height:100svh;display:flex;flex-direction:column;border-right:1px solid var(--line);background:#fff;padding:29px 16px}
+  .brand{display:flex;align-items:center;gap:9px;padding:0 10px;font:800 14px "Manrope",sans-serif;white-space:nowrap}
+  .mark{display:grid;place-items:center;width:29px;height:29px;border-radius:7px;background:var(--forest);color:white;font-size:18px}
+  .nav-label{padding:46px 14px 12px;color:var(--muted);font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase}
+  .nav-button{width:100%;border:0;border-radius:6px;padding:11px 13px;margin-bottom:4px;text-align:left;background:transparent;color:var(--muted);font-weight:600}
+  .nav-button:hover,.nav-button.active{color:var(--forest);background:#e8f1eb}
+  .sidebar-bottom{margin-top:auto;padding:18px 12px 0;border-top:1px solid var(--line);min-width:0}
+  .sidebar-bottom span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:13px;font-size:12px;color:var(--muted)}
+  .signout{border:0;padding:0;background:none;color:var(--forest);font-weight:700}
+  .workspace{min-width:0}
+  .topbar{height:75px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line);padding:0 clamp(20px,4vw,58px);background:white}
+  .topbar span{color:var(--muted);font-size:12px}.topbar strong{font:700 12px "Manrope",sans-serif;color:var(--forest)}
+  main{max-width:1200px;margin:0 auto;padding:36px clamp(20px,4vw,58px) 70px}
+  h1,h2,h3{font-family:"Manrope",sans-serif;line-height:1.25}h1{margin:0;font-size:clamp(25px,2.8vw,33px)}h2{font-size:17px;margin:0 0 18px}h3{font-size:14px;margin:0 0 14px}
+  .eyebrow{font-size:11px;text-transform:uppercase;letter-spacing:.12em;font-weight:700;color:var(--forest);margin:0 0 8px}
+  .section-head{display:flex;align-items:end;justify-content:space-between;gap:15px;margin-bottom:26px}.section-head p{color:var(--muted);margin:8px 0 0}
+  .hero{min-height:245px;display:flex;flex-direction:column;justify-content:end;padding:32px 38px;border-radius:7px;color:white;background:linear-gradient(90deg,rgba(16,45,39,.93),rgba(16,45,39,.25)),url('https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=1500&q=85') center 62%/cover}
+  .hero h1{font-size:clamp(28px,3vw,39px)}.hero p{max-width:470px;margin:10px 0 0;color:#dcece5}
+  .overview-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin:30px 0}
+  .overview-item{padding:20px 0;border-bottom:1px solid var(--line)}.overview-item strong{display:block;font:700 17px "Manrope",sans-serif;margin-bottom:5px}.overview-item span{color:var(--muted);font-size:13px}
+  .overview-item button{margin-top:16px}
+  .table-head{display:flex;justify-content:space-between;align-items:center;margin:32px 0 12px}.table-head h2{margin:0}
+  .card{margin-bottom:32px}.card h2{color:var(--ink)}.metric-panel{border-top:1px solid var(--line);margin-top:28px;padding-top:26px}
+  label{display:block;color:var(--muted);font-size:12px;font-weight:600;margin:0 0 7px}
+  input,select{width:100%;min-height:41px;padding:8px 12px;border:1px solid var(--line);border-radius:5px;background:white;color:var(--ink);outline:none}
+  input:focus,select:focus{border-color:var(--forest);box-shadow:0 0 0 3px #235c4824}
+  input[type=file]{padding:7px 10px}
+  .row{display:flex;gap:15px;flex-wrap:wrap}.row>div{flex:1;min-width:155px}
+  button:not(.nav-button):not(.signout){border:0;border-radius:5px;background:var(--forest);color:white;padding:10px 15px;font-size:12px;font-weight:700}
+  button:not(.nav-button):not(.signout):hover{background:var(--forest-light)}
+  button.secondary:not(.nav-button){background:#e7efe9;color:var(--forest)}button.secondary:not(.nav-button):hover{background:#d7e7dd}
+  button.danger:not(.nav-button){background:var(--red)}
+  .actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}
+  #uploadBtn{display:inline-flex;align-items:center;justify-content:center;gap:9px;min-height:41px;width:245px;max-width:100%}
+  #uploadBtn.is-loading::before{content:"";width:16px;height:16px;flex:0 0 16px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:upload-spin .8s linear infinite}
+  @keyframes upload-spin{to{transform:rotate(360deg)}}
+  @media(prefers-reduced-motion:reduce){#uploadBtn.is-loading::before{animation:none}}
+  .searchbar{display:flex;gap:10px;margin-bottom:20px}.searchbar input{flex:1;min-width:0}
+  .table-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:6px;background:white}
+  table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:12px 15px;border-bottom:1px solid #e9eeea;text-align:left}tr:last-child td{border-bottom:0}th{font-size:11px;text-transform:uppercase;color:var(--muted);background:#f9faf9}tr:hover td{background:#f5f9f6}td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}.neg{color:var(--red);font-weight:700}
+  .msg{display:none;margin:15px 0;padding:10px 13px;border-radius:5px;font-size:13px}.msg.ok{display:block;background:#e5f3eb;color:#215339}.msg.err{display:block;background:#fcebe7;color:#8f2d24}
+  small.hint{color:var(--muted);font-size:12px}
+  #deleteSaccoDialog{width:min(420px,calc(100vw - 32px));padding:0;border:1px solid var(--line);border-radius:8px;color:var(--ink);box-shadow:0 16px 48px #14231d40}
+  #deleteSaccoDialog::backdrop{background:#14231d80}
+  .delete-confirm-content{padding:24px}
+  .delete-confirm-content h2{margin:0 0 10px}
+  .delete-confirm-content p{margin:0 0 22px;color:var(--muted)}
+  .delete-dialog-actions{display:flex;gap:10px;margin:0}
+  @media(max-width:850px){.shell{display:block}.sidebar{position:static;height:auto;padding:15px 18px;flex-direction:row;flex-wrap:wrap;gap:12px;align-items:center}.brand{padding:0}.nav-label{display:none}.nav-button{width:auto;margin:0;padding:9px}.sidebar-bottom{margin:0 0 0 auto;border:0;padding:0}.sidebar-bottom span{display:none}.topbar{height:55px}.overview-grid{gap:16px}}
+  @media(max-width:550px){.sidebar{gap:7px}.brand{width:100%;margin-bottom:5px}.sidebar-bottom{margin-left:0}.nav-button{font-size:12px;padding:8px}.topbar{padding:0 18px}main{padding:23px 18px 55px}.hero{min-height:220px;padding:24px}.overview-grid{grid-template-columns:1fr;gap:0}.searchbar{flex-wrap:wrap}.searchbar input{flex-basis:100%}.section-head{align-items:start}}
+</style>
+</head>
+<body>
+<div class="shell hidden" id="shell">
+  <nav class="sidebar" aria-label="Workspace">
+    <div class="brand"><span class="mark" aria-hidden="true">🍏</span>SACCO PEARLS</div>
+    <span class="nav-label">Workspace</span>
+    <button class="nav-button active" data-view="home" onclick="showView('home')">Overview</button>
+    <button class="nav-button" data-view="saccos" onclick="showView('saccos')">SACCOs</button>
+    <button class="nav-button" data-view="metrics" onclick="showView('metrics')">Metrics</button>
+    <button class="nav-button" data-view="reports" onclick="showView('reports')">Reports</button>
+    <div class="sidebar-bottom"><span id="accountName"></span><button class="signout" onclick="logout()">Sign out</button></div>
+  </nav>
+  <div class="workspace">
+    <header class="topbar"><span>Admin workspace</span><strong id="status">Signed in</strong></header>
+    <main>
+      <section id="homeView" class="view">
+        <div class="hero"><p class="eyebrow" style="color:#c9e6d3">SACCO PEARLS</p><h1>Financial data in focus.</h1><p>Kenya's DT-SACCO records, ready to review.</p></div>
+        <div class="overview-grid">
+          <div class="overview-item"><strong>SACCO directory</strong><span id="directoryCount">Loading records...</span><br><button onclick="showView('saccos')">Browse SACCOs</button></div>
+          <div class="overview-item"><strong>Annual reports</strong><span>Import a SASRA financial stability appendix.</span><br><button class="secondary" onclick="showView('reports')">Open reports</button></div>
+        </div>
+        <div class="table-head"><h2>Directory preview</h2><button class="secondary" onclick="showView('saccos')">View directory</button></div>
+        <div class="table-wrap"><table id="previewTable"><thead><tr><th>SACCO</th><th>County</th></tr></thead><tbody><tr><td colspan="2">Loading...</td></tr></tbody></table></div>
+      </section>
+      <section id="saccosView" class="view hidden"><div class="section-head"><div><p class="eyebrow">Directory</p><h1>SACCOs</h1><p>Browse and manage licensed SACCO records.</p></div></div>
+
+  <!-- SACCO MANAGEMENT -->
+  <div class="card" id="saccoCard">
+
+    <div class="searchbar">
+      <input id="searchQ" placeholder="Search by name…" onkeydown="if(event.key==='Enter') searchSaccos()">
+      <button class="secondary" onclick="searchSaccos()">Search</button>
+      <button onclick="loadAllSaccos()">Show all</button>
+    </div>
+
+    <div class="table-wrap"><table id="saccoTable">
+      <thead><tr><th>ID</th><th>Name</th><th>County</th><th>Actions</th><th>Delete</th></tr></thead>
+      <tbody></tbody>
+    </table></div>
+
+    <div class="metric-panel">
+      <h2 style="margin-bottom:8px;">Add / edit a SACCO</h2>
+      <div class="row">
+        <div>
+          <label>SACCO ID (leave blank to create new)</label>
+          <input id="editId" placeholder="e.g. 12">
+        </div>
+        <div>
+          <label>Name</label>
+          <input id="editName" placeholder="e.g. STIMA DT.">
+        </div>
+        <div>
+          <label for="editCounty">County</label>
+          <select id="editCounty">
+            <option value="">Select county (optional)</option>
+            <option>Baringo</option>
+            <option>Bomet</option>
+            <option>Bungoma</option>
+            <option>Busia</option>
+            <option>Elgeyo Marakwet</option>
+            <option>Embu</option>
+            <option>Garissa</option>
+            <option>Homa Bay</option>
+            <option>Isiolo</option>
+            <option>Kajiado</option>
+            <option>Kakamega</option>
+            <option>Kericho</option>
+            <option>Kiambu</option>
+            <option>Kilifi</option>
+            <option>Kirinyaga</option>
+            <option>Kisii</option>
+            <option>Kisumu</option>
+            <option>Kitui</option>
+            <option>Kwale</option>
+            <option>Laikipia</option>
+            <option>Lamu</option>
+            <option>Machakos</option>
+            <option>Makueni</option>
+            <option>Mandera</option>
+            <option>Marsabit</option>
+            <option>Meru</option>
+            <option>Migori</option>
+            <option>Mombasa</option>
+            <option>Murang'a</option>
+            <option>Nairobi</option>
+            <option>Nakuru</option>
+            <option>Nandi</option>
+            <option>Narok</option>
+            <option>Nyamira</option>
+            <option>Nyandarua</option>
+            <option>Nyeri</option>
+            <option>Samburu</option>
+            <option>Siaya</option>
+            <option>Taita Taveta</option>
+            <option>Tana River</option>
+            <option>Tharaka Nithi</option>
+            <option>Trans Nzoia</option>
+            <option>Turkana</option>
+            <option>Uasin Gishu</option>
+            <option>Vihiga</option>
+            <option>Wajir</option>
+            <option>West Pokot</option>
+          </select>
+        </div>
+      </div>
+      <div class="actions">
+        <button onclick="saveSacco()">Save (create or update)</button>
+        <button class="danger" onclick="deleteSacco()">Delete by ID</button>
+      </div>
+      <div id="saccoMsg" class="msg"></div>
+    </div>
+  </div>
+  </section>
+  <section id="reportsView" class="view hidden"><div class="section-head"><div><p class="eyebrow">Data ingestion</p><h1>Annual reports</h1><p>Bring financial stability data into the directory.</p></div></div>
+
+  <!-- UPLOAD & EXTRACT -->
+  <div class="card" id="uploadCard">
+    <h2>Import stability appendix</h2>
+
+    <div class="row">
+      <div style="flex:2; min-width:240px;">
+        <label>SASRA report PDF</label>
+        <input type="file" id="uploadFile" accept="application/pdf">
+      </div>
+      <div><label for="uploadReportYear">Report year</label><select id="uploadReportYear"></select></div>
+    </div>
+    <div class="row" style="margin-top:12px;">
+      <div><label for="uploadPageStart">From page</label><input id="uploadPageStart" type="number" min="1" step="1" required></div>
+      <div><label for="uploadPageEnd">To page</label><input id="uploadPageEnd" type="number" min="1" step="1" required></div>
+      <div><label for="uploadPriorYear">Prior year (1st column)</label><select id="uploadPriorYear"></select></div>
+      <div><label for="uploadCurrentYear">Current year (2nd column)</label><select id="uploadCurrentYear"></select></div>
+    </div>
+
+    <div class="actions">
+      <button onclick="uploadReport()" id="uploadBtn" aria-busy="false">Extract &amp; load into database</button>
+    </div>
+    <div id="uploadMsg" class="msg" role="status" aria-live="polite"></div>
+    <div id="uploadPreview"></div>
+  </div>
+  </section>
+  <section id="metricsView" class="view hidden"><div class="section-head"><div><p class="eyebrow">Annual data</p><h1>Financial metrics</h1><p>Review reported ratios by SACCO and year.</p></div></div>
+
+  <!-- METRICS -->
+  <div class="card" id="metricsCard">
+    <div class="row">
+      <div>
+        <label for="metricSaccoId">SACCO ID or name</label>
+        <input id="metricSaccoId" placeholder="e.g. 12 or STIMA" oninput="resetMetricSelection()" onkeydown="if(event.key==='Enter') loadMetrics()">
+      </div>
+      <div style="align-self:flex-end;">
+        <button onclick="loadMetrics()">Load trend</button>
+      </div>
+    </div>
+
+    <div id="metricSearchResults" class="actions" aria-label="Matching SACCOs"></div>
+    <h2 id="metricSaccoName" class="hidden" style="margin-top:20px;overflow-wrap:anywhere;"></h2>
+    <div class="table-wrap" style="margin-top:20px"><table id="metricsTable">
+      <thead><tr><th>Year</th><th class="num">CCA %</th><th class="num">CCD %</th><th class="num">ICA %</th><th class="num">Ext. Borrow %</th><th class="num">NPL %</th><th>Actions</th></tr></thead>
+      <tbody></tbody>
+    </table></div>
+
+    <div class="metric-panel">
+      <h2 id="metricFormTitle" style="margin-bottom:8px;">Add a year's metrics</h2>
+      <div class="row">
+        <div><label>Data year</label><input id="mYear" placeholder="2024"></div>
+        <div><label>CCA %</label><input id="mCCA"></div>
+        <div><label>CCD %</label><input id="mCCD"></div>
+        <div><label>ICA %</label><input id="mICA"></div>
+        <div><label>Ext. borrowing %</label><input id="mExt"></div>
+        <div><label>NPL %</label><input id="mNPL"></div>
+      </div>
+      <div class="actions">
+        <button onclick="addMetric()" id="saveMetricBtn">Save metrics</button>
+        <button class="secondary hidden" onclick="clearMetricForm()" id="cancelMetricBtn">Cancel edit</button>
+      </div>
+      <div id="metricMsg" class="msg"></div>
+    </div>
+  </div>
+  </section>
+    </main>
+  </div>
+</div>
+
+<dialog id="deleteSaccoDialog" aria-labelledby="deleteSaccoTitle" aria-describedby="deleteSaccoDescription">
+  <div class="delete-confirm-content">
+    <h2 id="deleteSaccoTitle">Confirm SACCO deletion</h2>
+    <p id="deleteSaccoDescription"></p>
+    <form method="dialog" class="delete-dialog-actions">
+      <button type="submit" value="yes" class="danger">Yes, delete</button>
+      <button type="submit" value="no" class="secondary" autofocus>No, keep it</button>
+    </form>
+  </div>
+</dialog>
+
+<script>
+let TOKEN = sessionStorage.getItem('saccoAdminToken');
+let editingMetricId = null;
+let selectedMetricSacco = null;
+let metricSearchVersion = 0;
+
+function populateYearSelect(id){
+  const select = document.getElementById(id);
+  const blank = document.createElement('option');
+  blank.value = '';
+  blank.textContent = '';
+  select.append(blank);
+  for(let year = 2024; year >= 2020; year--){
+    const option = document.createElement('option');
+    option.value = String(year);
+    option.textContent = String(year);
+    select.append(option);
+  }
+  select.value = '';
+}
+
+populateYearSelect('uploadReportYear');
+populateYearSelect('uploadPriorYear');
+populateYearSelect('uploadCurrentYear');
+
+function base(){ return sessionStorage.getItem('saccoApiBase') || 'http://127.0.0.1:8000'; }
+
+function showView(view){
+  for(const section of document.querySelectorAll('.view')){
+    section.classList.toggle('hidden', section.id !== view + 'View');
+  }
+  for(const button of document.querySelectorAll('.nav-button')){
+    button.classList.toggle('active', button.dataset.view === view);
+  }
+  window.scrollTo(0, 0);
+}
+
+function showMsg(id, text, ok){
+  const el = document.getElementById(id);
+  el.textContent = text;
+  el.className = 'msg ' + (ok ? 'ok' : 'err');
+}
+
+function logout(){
+  sessionStorage.removeItem('saccoAdminToken');
+  sessionStorage.removeItem('saccoAdminName');
+  TOKEN = null;
+  location.replace('login.html');
+}
+
+async function openWorkspace(){
+  if(!TOKEN){ location.replace('login.html'); return; }
+  try{
+    const response = await fetch(base() + '/users/me', { headers: {Authorization: 'Bearer ' + TOKEN} });
+    if(!response.ok) throw new Error('Session expired');
+    const user = await response.json();
+    if(user.role !== 'admin') throw new Error('Admin access required');
+    document.getElementById('accountName').textContent = user.full_name || user.email;
+    document.getElementById('status').textContent = user.email;
+    document.getElementById('shell').classList.remove('hidden');
+    showView('home');
+    loadAllSaccos();
+  }catch(error){
+    logout();
+  }
+}
+
+function authHeaders(){
+  return TOKEN ? { 'Authorization': 'Bearer ' + TOKEN, 'Content-Type': 'application/json' }
+               : { 'Content-Type': 'application/json' };
+}
+
+function renderSaccos(list, updateOverview = false){
+  const tbody = document.querySelector('#saccoTable tbody');
+  const preview = document.querySelector('#previewTable tbody');
+  tbody.replaceChildren();
+  if(updateOverview){
+    preview.replaceChildren();
+    document.getElementById('directoryCount').textContent = `${list.length} records loaded`;
+  }
+  if(!list.length){
+    tbody.innerHTML = '<tr><td colspan="5"><small class="hint">No SACCOs found.</small></td></tr>';
+    if(updateOverview) preview.innerHTML = '<tr><td colspan="2">No SACCOs found.</td></tr>';
+    return;
+  }
+  for(const s of list){
+    const tr = document.createElement('tr');
+    for(const value of [s.id, s.name, s.county ?? '—']){
+      const cell = tr.insertCell();
+      cell.textContent = value;
+    }
+    const action = tr.insertCell();
+    const edit = document.createElement('button');
+    edit.className = 'secondary';
+    edit.textContent = 'Edit';
+    edit.addEventListener('click', () => { fillEdit(s.id, s.name, s.county || ''); showView('saccos'); });
+    const metrics = document.createElement('button');
+    metrics.className = 'secondary';
+    metrics.textContent = 'Metrics';
+    metrics.style.marginLeft = '7px';
+    metrics.addEventListener('click', () => {
+      document.getElementById('metricSaccoId').value = s.id;
+      showView('metrics');
+      loadMetrics();
+    });
+    action.append(edit, metrics);
+    const deleteCell = tr.insertCell();
+    const remove = document.createElement('button');
+    remove.className = 'danger';
+    remove.textContent = 'Delete';
+    remove.addEventListener('click', () => deleteSacco(s.id, s.name));
+    deleteCell.appendChild(remove);
+    tbody.appendChild(tr);
+  }
+  if(updateOverview){
+    for(const s of list.slice(0, 6)){
+      const row = preview.insertRow();
+      row.insertCell().textContent = s.name;
+      row.insertCell().textContent = s.county || '—';
+    }
+  }
+}
+
+function fillEdit(id, name, county){
+  document.getElementById('editId').value = id;
+  document.getElementById('editName').value = name;
+  document.getElementById('editCounty').value = county;
+  document.getElementById('metricSaccoId').value = id;
+}
+
+async function loadAllSaccos(){
+  try{
+    const r = await fetch(base() + '/saccos?limit=200');
+    if(!r.ok) throw new Error();
+    renderSaccos(await r.json(), true);
+  }catch(error){
+    document.getElementById('directoryCount').textContent = 'Directory unavailable';
+    document.querySelector('#previewTable tbody').innerHTML = '<tr><td colspan="2">Could not load SACCOs.</td></tr>';
+    showMsg('saccoMsg', 'Could not load SACCOs. Check the API connection.', false);
+  }
+}
+
+async function searchSaccos(){
+  const q = document.getElementById('searchQ').value.trim();
+  try{
+    const r = await fetch(base() + '/saccos?limit=200&q=' + encodeURIComponent(q));
+    if(!r.ok) throw new Error();
+    renderSaccos(await r.json());
+  }catch(error){ showMsg('saccoMsg', 'Search failed. Check the API connection.', false); }
+}
+
+async function saveSacco(){
+  const id = document.getElementById('editId').value.trim();
+  const name = document.getElementById('editName').value.trim();
+  const county = document.getElementById('editCounty').value.trim();
+  if(!name){ showMsg('saccoMsg', 'Name is required.', false); return; }
+  const body = JSON.stringify({ name, county: county || null });
+  try{
+    let r;
+    if(id){
+      r = await fetch(base() + '/saccos/' + id, { method:'PUT', headers: authHeaders(), body });
+    }else{
+      r = await fetch(base() + '/saccos', { method:'POST', headers: authHeaders(), body });
+    }
+    const data = await r.json();
+    if(!r.ok){ showMsg('saccoMsg', data.detail || 'Save failed (are you logged in as admin?)', false); return; }
+    showMsg('saccoMsg', id ? 'Updated.' : `Created with ID ${data.id}.`, true);
+    loadAllSaccos();
+  }catch(e){ showMsg('saccoMsg', 'Request failed.', false); }
+}
+
+async function deleteSacco(id = document.getElementById('editId').value.trim(), name = ''){
+  if(!id){ showMsg('saccoMsg', 'Enter a SACCO ID to delete.', false); return; }
+  const label = name ? `${name} (ID ${id})` : id;
+  const confirmed = await confirmSaccoDelete(label);
+  if(!confirmed) return;
+  const r = await fetch(base() + '/saccos/' + id, { method:'DELETE', headers: authHeaders() });
+  if(r.status === 204){ showMsg('saccoMsg', 'Deleted.', true); loadAllSaccos(); }
+  else{
+    const data = await r.json().catch(()=>({}));
+    showMsg('saccoMsg', data.detail || 'Delete failed (are you logged in as admin?)', false);
+  }
+}
+
+function confirmSaccoDelete(label){
+  const dialog = document.getElementById('deleteSaccoDialog');
+  document.getElementById('deleteSaccoDescription').textContent =
+    `Are you sure you want to delete ${label}? This will also permanently remove its metrics.`;
+  dialog.returnValue = 'no';
+  return new Promise(resolve => {
+    dialog.addEventListener('close', () => resolve(dialog.returnValue === 'yes'), {once:true});
+    dialog.showModal();
+  });
+}
+
+function renderMetrics(list){
+  const tbody = document.querySelector('#metricsTable tbody');
+  tbody.replaceChildren();
+  if(!list.length){
+    tbody.innerHTML = '<tr><td colspan="7"><small class="hint">No metrics yet for this SACCO.</small></td></tr>';
+    return;
+  }
+  for(const m of list){
+    const row = tbody.insertRow();
+    row.insertCell().textContent = m.data_year;
+    for(const field of ['cca','ccd','ica','ext_borrowing','npl_ratio']){
+      const cell = row.insertCell();
+      cell.className = 'num' + (m[field] < 0 ? ' neg' : '');
+      cell.textContent = m[field] ?? '—';
+    }
+    const action = row.insertCell();
+    const edit = document.createElement('button');
+    edit.className = 'secondary';
+    edit.textContent = 'Edit';
+    edit.addEventListener('click', () => editMetric(m));
+    const remove = document.createElement('button');
+    remove.className = 'danger';
+    remove.textContent = 'Delete';
+    remove.style.marginLeft = '7px';
+    remove.addEventListener('click', () => deleteMetric(m.id));
+    action.append(edit, remove);
+  }
+}
+
+function editMetric(metric){
+  editingMetricId = metric.id;
+  document.getElementById('mYear').value = metric.data_year;
+  document.getElementById('mYear').disabled = true;
+  for(const [field, input] of [['cca','mCCA'],['ccd','mCCD'],['ica','mICA'],['ext_borrowing','mExt'],['npl_ratio','mNPL']]){
+    document.getElementById(input).value = metric[field] ?? '';
+  }
+  document.getElementById('metricFormTitle').textContent = `Edit ${metric.data_year} metrics`;
+  document.getElementById('cancelMetricBtn').classList.remove('hidden');
+  document.getElementById('mCCA').focus();
+}
+
+function clearMetricForm(){
+  editingMetricId = null;
+  document.getElementById('mYear').disabled = false;
+  for(const id of ['mYear','mCCA','mCCD','mICA','mExt','mNPL']) document.getElementById(id).value = '';
+  document.getElementById('metricFormTitle').textContent = "Add a year's metrics";
+  document.getElementById('cancelMetricBtn').classList.add('hidden');
+}
+
+async function deleteMetric(id){
+  if(!confirm('Delete this year of financial metrics?')) return;
+  try{
+    const response = await fetch(base() + '/metrics/' + id, {method:'DELETE', headers:authHeaders()});
+    if(!response.ok) throw new Error('Could not delete metrics.');
+    clearMetricForm();
+    await loadMetrics();
+    showMsg('metricMsg', 'Metrics deleted.', true);
+  }catch(error){ showMsg('metricMsg', error.message, false); }
+}
+
+async function uploadReport(){
+  if(document.getElementById('uploadBtn').disabled) return;
+  const fileInput = document.getElementById('uploadFile');
+  const fromPage = document.getElementById('uploadPageStart').value;
+  const toPage = document.getElementById('uploadPageEnd').value;
+  const reportYear = document.getElementById('uploadReportYear').value.trim();
+  const priorYear = document.getElementById('uploadPriorYear').value.trim();
+  const currentYear = document.getElementById('uploadCurrentYear').value.trim();
+
+  if(!fileInput.files.length){ showMsg('uploadMsg', 'Choose a PDF file first.', false); return; }
+  if(!fromPage || !toPage || !reportYear || !priorYear || !currentYear){
+    showMsg('uploadMsg', 'Fill in both page numbers, report year, and both data years.', false); return;
+  }
+  const firstPage = Number(fromPage);
+  const lastPage = Number(toPage);
+  if(!Number.isInteger(firstPage) || !Number.isInteger(lastPage) || firstPage < 1 || lastPage < firstPage){
+    showMsg('uploadMsg', 'Use positive whole-number pages, with the To page greater than or equal to the From page.', false); return;
+  }
+
+  const form = new FormData();
+  form.append('file', fileInput.files[0]);
+  form.append('pages', `${firstPage}-${lastPage}`);
+  form.append('report_year', reportYear);
+  form.append('prior_year', priorYear);
+  form.append('current_year', currentYear);
+
+  const btn = document.getElementById('uploadBtn');
+  btn.disabled = true;
+  btn.classList.add('is-loading');
+  btn.setAttribute('aria-busy', 'true');
+  btn.textContent = 'Extracting...';
+  const message = document.getElementById('uploadMsg');
+  message.textContent = '';
+  message.className = 'msg';
+  document.getElementById('uploadPreview').innerHTML = '';
+
+  try{
+    // NOTE: do not set Content-Type manually for FormData — the browser
+    // sets the correct multipart boundary automatically. Only the auth
+    // header is needed here.
+    const r = await fetch(base() + '/ingest/stability', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + TOKEN },
+      body: form,
+    });
+    const data = await r.json();
+    if(!r.ok){
+      showMsg('uploadMsg', data.detail || 'Upload failed.', false);
+      return;
+    }
+    showMsg('uploadMsg',
+      `Done. Extracted ${data.rows_extracted} rows — ` +
+      `${data.saccos_created} new SACCOs created, ${data.metrics_created} metric rows created, ` +
+      `${data.metrics_updated} updated.`, true);
+
+    if(data.preview && data.preview.length){
+      let html = '<table style="margin-top:10px;"><thead><tr><th>Name</th><th>Year</th>' +
+                 '<th class="num">CCA</th><th class="num">CCD</th><th class="num">ICA</th>' +
+                 '<th class="num">Ext.Borrow</th><th class="num">NPL</th></tr></thead><tbody>';
+      for(const row of data.preview){
+        html += `<tr><td>${row.sacco_name}</td><td>${row.data_year}</td>
+          <td class="num">${row.cca ?? '—'}</td><td class="num">${row.ccd ?? '—'}</td>
+          <td class="num">${row.ica ?? '—'}</td><td class="num">${row.ext_borrowing ?? '—'}</td>
+          <td class="num">${row.npl_ratio ?? '—'}</td></tr>`;
+      }
+      html += '</tbody></table><small class="hint">Preview of the first rows extracted.</small>';
+      document.getElementById('uploadPreview').innerHTML = html;
+    }
+    loadAllSaccos();
+  }catch(e){
+    showMsg('uploadMsg', 'Could not reach the API, or the request timed out.', false);
+  }finally{
+    btn.disabled = false;
+    btn.classList.remove('is-loading');
+    btn.setAttribute('aria-busy', 'false');
+    btn.textContent = 'Extract & load into database';
+  }
+}
+
+function resetMetricSelection(){
+  metricSearchVersion++;
+  selectedMetricSacco = null;
+  document.getElementById('metricSearchResults').replaceChildren();
+  const heading = document.getElementById('metricSaccoName');
+  heading.textContent = '';
+  heading.classList.add('hidden');
+  clearMetricForm();
+  renderMetrics([]);
+  document.getElementById('metricMsg').className = 'msg';
+}
+
+async function loadMetrics(sacco = null){
+  const query = document.getElementById('metricSaccoId').value.trim();
+  resetMetricSelection();
+  const version = metricSearchVersion;
+  if(!query){ showMsg('metricMsg', 'Enter a SACCO ID or name.', false); return; }
+  try{
+    if(!sacco){
+      const isId = /^\d+$/.test(query);
+      const response = await fetch(base() + (isId ? '/saccos/' + encodeURIComponent(query) : '/saccos?limit=200&q=' + encodeURIComponent(query)));
+      if(version !== metricSearchVersion) return;
+      if(!response.ok) throw new Error(response.status === 404 ? 'SACCO not found.' : 'Could not search SACCOs.');
+      const results = await response.json();
+      if(version !== metricSearchVersion) return;
+      if(isId){
+        sacco = results;
+      }else{
+        const exact = results.find(item => item.name.toLowerCase() === query.toLowerCase());
+        if(exact || results.length === 1){
+          sacco = exact || results[0];
+        }else if(!results.length){
+          showMsg('metricMsg', 'No SACCOs match that name.', false); return;
+        }else{
+          const container = document.getElementById('metricSearchResults');
+          for(const match of results){
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'secondary';
+            button.style.whiteSpace = 'normal';
+            button.style.overflowWrap = 'anywhere';
+            button.textContent = `${match.name} (ID ${match.id})`;
+            button.addEventListener('click', () => loadMetrics(match));
+            container.append(button);
+          }
+          showMsg('metricMsg', 'Select a SACCO from the matching results.', true); return;
+        }
+      }
+    }
+    const response = await fetch(base() + '/saccos/' + sacco.id + '/metrics');
+    if(version !== metricSearchVersion) return;
+    if(!response.ok) throw new Error('Could not load metrics.');
+    const data = await response.json();
+    if(version !== metricSearchVersion) return;
+    selectedMetricSacco = sacco;
+    document.getElementById('metricSaccoId').value = String(sacco.id);
+    const heading = document.getElementById('metricSaccoName');
+    heading.textContent = `${sacco.name} (ID ${sacco.id})`;
+    heading.classList.remove('hidden');
+    renderMetrics(data);
+    showMsg('metricMsg', data.length ? `Loaded ${data.length} year(s).` : 'No metrics recorded for this SACCO yet.', true);
+  }catch(error){
+    if(version === metricSearchVersion) showMsg('metricMsg', error.message || 'Could not reach the API.', false);
+  }
+}
+
+async function addMetric(){
+  const id = selectedMetricSacco?.id;
+  const num = v => v === '' ? null : parseFloat(v);
+  if(!id){ showMsg('metricMsg', 'Search and select a SACCO first.', false); return; }
+  const year = Number(document.getElementById('mYear').value);
+  if(!editingMetricId && (!Number.isInteger(year) || year < 2000 || year > 2100)){
+    showMsg('metricMsg', 'Enter a valid data year.', false); return;
+  }
+  const values = {
+    cca: num(document.getElementById('mCCA').value),
+    ccd: num(document.getElementById('mCCD').value),
+    ica: num(document.getElementById('mICA').value),
+    ext_borrowing: num(document.getElementById('mExt').value),
+    npl_ratio: num(document.getElementById('mNPL').value),
+  };
+  const isEditing = editingMetricId !== null;
+  const endpoint = isEditing ? '/metrics/' + editingMetricId : '/saccos/' + id + '/metrics';
+  const body = JSON.stringify(isEditing ? values : {data_year:year, ...values});
+  try{
+    const r = await fetch(base() + endpoint, {method:isEditing ? 'PUT' : 'POST', headers:authHeaders(), body});
+    const data = await r.json();
+    if(!r.ok){ showMsg('metricMsg', data.detail || 'Save failed.', false); return; }
+    await loadMetrics();
+    showMsg('metricMsg', isEditing ? 'Metrics updated.' : 'Metrics added.', true);
+  }catch(error){ showMsg('metricMsg', 'Could not save metrics.', false); }
+}
+openWorkspace();
+</script>
+</body>
+</html>

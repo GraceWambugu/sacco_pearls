@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign in | SACCO PEARLS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{--ink:#20302b;--muted:#69736f;--line:#d9dfdb;--green:#235c48;--paper:#f2f4f1;--red:#ad4539}
+  *{box-sizing:border-box}
+  body{margin:0;color:var(--ink);background:var(--paper);font-family:"DM Sans",sans-serif}
+  .page{min-height:100svh;display:grid;grid-template-columns:minmax(0,56%) minmax(350px,44%);gap:14px;padding:14px}
+  .form-side{position:relative;display:flex;flex-direction:column;min-height:calc(100svh - 28px);background:#f6f7f5;border-radius:8px}
+  .brand{display:flex;align-items:center;gap:10px;padding:32px 44px;font:800 16px "Manrope",sans-serif;color:var(--ink)}
+  .mark{display:grid;place-items:center;width:29px;height:29px;background:var(--green);color:white;border-radius:7px;font-size:19px;line-height:1}
+  .form-wrap{width:min(100% - 48px,390px);margin:auto; padding:40px 0 70px}
+  .overline{margin:0 0 14px;font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.12em}
+  h1{margin:0 0 11px;font:700 clamp(29px,3vw,38px)/1.16 "Manrope",sans-serif}
+  .subtitle{margin:0 0 40px;color:var(--muted);font-size:14px}
+  label{display:block;margin:18px 0 8px;font-size:12px;font-weight:700}
+  input{width:100%;height:47px;border:1px solid var(--line);border-radius:7px;background:white;padding:0 15px;color:var(--ink);font:500 14px "DM Sans",sans-serif;outline:none}
+  input:focus{border-color:var(--green);box-shadow:0 0 0 3px #235c4824}
+  .submit{width:100%;height:47px;margin-top:27px;border:0;border-radius:7px;background:var(--green);color:white;font:700 13px "Manrope",sans-serif;cursor:pointer}
+  .submit:hover{background:#174c3a}.submit:disabled{opacity:.65;cursor:wait}
+  .message{min-height:20px;margin:16px 0 0;color:var(--red);font-size:13px}
+  details{margin-top:35px;border-top:1px solid var(--line);padding-top:18px;color:var(--muted);font-size:12px}
+  summary{cursor:pointer;width:max-content}details label{margin-top:15px;color:var(--ink)}
+  .footer{padding:24px 44px;color:var(--muted);font-size:12px}
+  .photo{position:relative;overflow:hidden;min-height:calc(100svh - 28px);border-radius:8px;background:#73888c url('https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=1500&q=85') center/cover no-repeat}
+  .photo:after{content:"";position:absolute;inset:40% 0 0;background:linear-gradient(transparent,rgba(14,29,28,.7))}
+  .photo-caption{position:absolute;z-index:1;bottom:42px;left:40px;right:40px;color:white}
+  .photo-caption strong{display:block;font:700 clamp(24px,2.5vw,34px)/1.2 "Manrope",sans-serif;max-width:440px}
+  .photo-caption span{display:block;margin-bottom:16px;font-size:11px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:#d0e6dd}
+  @media(max-width:760px){.page{display:flex;flex-direction:column;padding:8px;gap:8px}.form-side{min-height:calc(100svh - 16px)}.brand{padding:23px 22px}.form-wrap{width:min(100% - 40px,390px);padding:20px 0 35px}.footer{padding:20px 22px}.photo{min-height:250px}.photo-caption{left:24px;bottom:25px}}
+</style>
+</head>
+<body>
+<div class="page">
+  <section class="form-side">
+    <div class="brand"><span class="mark" aria-hidden="true">🍏</span>SACCO PEARLS</div>
+    <div class="form-wrap">
+      <p class="overline">Administration</p>
+      <h1>Welcome back.</h1>
+      <p class="subtitle">Sign in to your workspace.</p>
+      <form id="loginForm">
+        <label for="email">Email address</label>
+        <input id="email" type="email" autocomplete="username" placeholder="name@example.com" required>
+        <label for="password">Password</label>
+        <input id="password" type="password" autocomplete="current-password" placeholder="Enter your password" required>
+        <button class="submit" id="submit" type="submit">Sign in</button>
+        <p class="message" id="message" role="alert" aria-live="polite"></p>
+      </form>
+      <details><summary>Connection settings</summary>
+        <label for="apiBase">API address</label>
+        <input id="apiBase" type="url" value="http://127.0.0.1:8000" autocomplete="off">
+      </details>
+    </div>
+    <div class="footer">SACCO PEARLS &nbsp;·&nbsp; Admin workspace</div>
+  </section>
+  <aside class="photo" aria-label="Modern architectural facade">
+    <div class="photo-caption"><span>Financial data, clearly held</span><strong>Every SACCO. A clearer picture.</strong></div>
+  </aside>
+</div>
+<script>
+  const form = document.getElementById('loginForm');
+  const message = document.getElementById('message');
+  const submit = document.getElementById('submit');
+  const apiInput = document.getElementById('apiBase');
+  apiInput.value = sessionStorage.getItem('saccoApiBase') || apiInput.value;
+
+  form.addEventListener('submit', async event => {
+    event.preventDefault();
+    const apiBase = apiInput.value.trim().replace(/\/$/, '');
+    const body = new URLSearchParams();
+    body.set('username', document.getElementById('email').value.trim());
+    body.set('password', document.getElementById('password').value);
+    message.textContent = '';
+    submit.disabled = true;
+    submit.textContent = 'Signing in...';
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    try {
+      const response = await fetch(apiBase + '/auth/login', {method:'POST', body, signal:controller.signal});
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.detail || 'Sign in failed.');
+      const accountResponse = await fetch(apiBase + '/users/me', {
+        headers: {Authorization: 'Bearer ' + result.access_token},
+        signal: controller.signal
+      });
+      if (!accountResponse.ok) throw new Error('Could not verify your account.');
+      const account = await accountResponse.json();
+      if (account.role !== 'admin') throw new Error('This workspace requires an admin account.');
+      sessionStorage.setItem('saccoApiBase', apiBase);
+      sessionStorage.setItem('saccoAdminToken', result.access_token);
+      sessionStorage.setItem('saccoAdminName', account.full_name || account.email);
+      location.assign('admin.html');
+    } catch (error) {
+      message.textContent = error.name === 'AbortError'
+        ? 'Sign in timed out. Check that the backend is running and try again.'
+        : error instanceof TypeError ? 'Cannot reach the API. Check the connection settings.' : error.message;
+      submit.disabled = false;
+      submit.textContent = 'Sign in';
+    } finally {
+      clearTimeout(timeout);
+    }
+  });
+</script>
+</body>
+</html>
