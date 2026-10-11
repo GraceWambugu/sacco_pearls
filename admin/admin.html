@@ -178,11 +178,15 @@
     </div>
   </div>
   </section>
-  <section id="reportsView" class="view hidden"><div class="section-head"><div><p class="eyebrow">Data ingestion</p><h1>Annual reports</h1><p>Bring financial stability data into the directory.</p></div></div>
+  <section id="reportsView" class="view hidden"><div class="section-head"><div><p class="eyebrow">Data ingestion</p><h1>Annual reports</h1><p>Bring financial stability and growth data into the directory.</p></div></div>
 
   <!-- UPLOAD & EXTRACT -->
   <div class="card" id="uploadCard">
-    <h2>Import stability appendix</h2>
+    <h2>Import report appendix</h2>
+
+    <div class="row" style="margin-bottom:12px;">
+      <div style="flex:2; min-width:240px;"><label for="uploadKind">Appendix type</label><select id="uploadKind"><option value="stability">Stability ratios (CCA, CCD, ICA, borrowing, NPL)</option><option value="growth">Growth indicators (assets, deposits, loans, income)</option></select></div>
+    </div>
 
     <div class="row">
       <div style="flex:2; min-width:240px;">
@@ -197,6 +201,7 @@
       <div><label for="uploadPriorYear">Prior year (1st column)</label><select id="uploadPriorYear"></select></div>
       <div><label for="uploadCurrentYear">Current year (2nd column)</label><select id="uploadCurrentYear"></select></div>
     </div>
+    <small class="hint">For older single-year reports (the 2020 report), choose the same year for both.</small>
 
     <div class="actions">
       <button onclick="uploadReport()" id="uploadBtn" aria-busy="false">Extract &amp; load into database</button>
@@ -522,6 +527,7 @@ async function uploadReport(){
   const reportYear = document.getElementById('uploadReportYear').value.trim();
   const priorYear = document.getElementById('uploadPriorYear').value.trim();
   const currentYear = document.getElementById('uploadCurrentYear').value.trim();
+  const kind = document.getElementById('uploadKind').value;
 
   if(!fileInput.files.length){ showMsg('uploadMsg', 'Choose a PDF file first.', false); return; }
   if(!fromPage || !toPage || !reportYear || !priorYear || !currentYear){
@@ -554,7 +560,7 @@ async function uploadReport(){
     // NOTE: do not set Content-Type manually for FormData — the browser
     // sets the correct multipart boundary automatically. Only the auth
     // header is needed here.
-    const r = await fetch(base() + '/ingest/stability', {
+    const r = await fetch(base() + (kind === 'growth' ? '/ingest/growth' : '/ingest/stability'), {
       method: 'POST',
       headers: { 'Authorization': 'Bearer ' + TOKEN },
       body: form,
@@ -570,14 +576,14 @@ async function uploadReport(){
       `${data.metrics_updated} updated.`, true);
 
     if(data.preview && data.preview.length){
+      const cols = kind === 'growth'
+        ? [['total_assets','Assets'],['total_deposits','Deposits'],['gross_loans','Loans'],['total_income','Income']]
+        : [['cca','CCA'],['ccd','CCD'],['ica','ICA'],['ext_borrowing','Ext.Borrow'],['npl_ratio','NPL']];
       let html = '<table style="margin-top:10px;"><thead><tr><th>Name</th><th>Year</th>' +
-                 '<th class="num">CCA</th><th class="num">CCD</th><th class="num">ICA</th>' +
-                 '<th class="num">Ext.Borrow</th><th class="num">NPL</th></tr></thead><tbody>';
+                 cols.map(c => `<th class="num">${c[1]}</th>`).join('') + '</tr></thead><tbody>';
       for(const row of data.preview){
-        html += `<tr><td>${row.sacco_name}</td><td>${row.data_year}</td>
-          <td class="num">${row.cca ?? '—'}</td><td class="num">${row.ccd ?? '—'}</td>
-          <td class="num">${row.ica ?? '—'}</td><td class="num">${row.ext_borrowing ?? '—'}</td>
-          <td class="num">${row.npl_ratio ?? '—'}</td></tr>`;
+        html += `<tr><td>${row.sacco_name}</td><td>${row.data_year}</td>` +
+                cols.map(c => `<td class="num">${row[c[0]] ?? '—'}</td>`).join('') + '</tr>';
       }
       html += '</tbody></table><small class="hint">Preview of the first rows extracted.</small>';
       document.getElementById('uploadPreview').innerHTML = html;
