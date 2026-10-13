@@ -49,6 +49,20 @@ class Token(BaseModel):
     token_type: str = "bearer"
 
 
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class PasswordResetRequest(BaseModel):
+    token: str = Field(min_length=30, max_length=128)
+    new_password: str
+
+    @field_validator("new_password")
+    @classmethod
+    def _pw(cls, v):
+        return _check_password(v)
+
+
 # ---------- saccos ----------
 class SaccoCreate(BaseModel):
     name: str = Field(min_length=1, max_length=200)
@@ -65,6 +79,7 @@ class SaccoOut(BaseModel):
     id: int
     name: str
     county: Optional[str] = None
+    is_archived: bool = False
 
 
 # ---------- financial metrics ----------

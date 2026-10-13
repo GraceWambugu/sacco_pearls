@@ -21,7 +21,7 @@ def list_saccos(
     limit: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
 ):
-    stmt = select(Sacco)
+    stmt = select(Sacco).where(Sacco.is_archived.is_(False))
     if q:
         stmt = stmt.where(Sacco.name.ilike(f"%{q}%"))
     if county:
@@ -29,10 +29,23 @@ def list_saccos(
     return db.scalars(stmt.order_by(Sacco.name).offset(skip).limit(limit)).all()
 
 
+@router.get("/archived", response_model=list[SaccoOut], dependencies=[Depends(require_admin)])
+def list_archived_saccos(
+    q: Optional[str] = Query(None, description="search by name"),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
+    db: Session = Depends(get_db),
+):
+    stmt = select(Sacco).where(Sacco.is_archived.is_(True))
+    if q:
+        stmt = stmt.where(Sacco.name.ilike(f"%{q}%"))
+    return db.scalars(stmt.order_by(Sacco.name).offset(skip).limit(limit)).all()
+
+
 @router.get("/{sacco_id}", response_model=SaccoOut)
 def get_sacco(sacco_id: int, db: Session = Depends(get_db)):
     sacco = db.get(Sacco, sacco_id)
-    if not sacco:
+    if not sacco or sacco.is_archived:
         raise HTTPException(404, "SACCO not found")
     return sacco
 
@@ -56,7 +69,7 @@ def create_sacco(data: SaccoCreate, db: Session = Depends(get_db)):
 @router.put("/{sacco_id}", response_model=SaccoOut, dependencies=[Depends(require_admin)])
 def update_sacco(sacco_id: int, data: SaccoUpdate, db: Session = Depends(get_db)):
     sacco = db.get(Sacco, sacco_id)
-    if not sacco:
+    if not sacco or sacco.is_archived:
         raise HTTPException(404, "SACCO not found")
     if data.name is not None and data.name != sacco.name:
         if db.scalar(select(Sacco).where(Sacco.name == data.name)):
@@ -73,8 +86,20 @@ def update_sacco(sacco_id: int, data: SaccoUpdate, db: Session = Depends(get_db)
                dependencies=[Depends(require_admin)])
 def delete_sacco(sacco_id: int, db: Session = Depends(get_db)):
     sacco = db.get(Sacco, sacco_id)
-    if not sacco:
+    if not sacco or sacco.is_archived:
         raise HTTPException(404, "SACCO not found")
-    db.delete(sacco)  # aliases, metrics and scores are removed too (cascade)
+    sacco.is_archived = True
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/{sacco_id}/restore", response_model=SaccoOut,
+             dependencies=[Depends(require_admin)])
+def restore_sacco(sacco_id: int, db: Session = Depends(get_db)):
+    sacco = db.get(Sacco, sacco_id)
+    if not sacco:
+        raise HTTPException(404, "SACCO not found")
+    sacco.is_archived = False
+    db.commit()
+    db.refresh(sacco)
+    return sacco

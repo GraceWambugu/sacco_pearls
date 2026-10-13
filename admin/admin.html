@@ -99,9 +99,13 @@
       <button class="secondary" onclick="searchSaccos()">Search</button>
       <button onclick="loadAllSaccos()">Show all</button>
     </div>
+    <div class="actions" role="group" aria-label="SACCO status filter">
+      <button id="activeSaccosButton" onclick="loadAllSaccos()">Active SACCOs</button>
+      <button id="archivedSaccosButton" class="secondary" onclick="loadArchivedSaccos()">Archived SACCOs</button>
+    </div>
 
     <div class="table-wrap"><table id="saccoTable">
-      <thead><tr><th>ID</th><th>Name</th><th>County</th><th>Actions</th><th>Delete</th></tr></thead>
+      <thead><tr><th>ID</th><th>Name</th><th>County</th><th>Status</th><th>Actions</th><th>Archive</th></tr></thead>
       <tbody></tbody>
     </table></div>
 
@@ -172,7 +176,7 @@
       </div>
       <div class="actions">
         <button onclick="saveSacco()">Save (create or update)</button>
-        <button class="danger" onclick="deleteSacco()">Delete by ID</button>
+        <button class="danger" onclick="deleteSacco()">Archive by ID</button>
       </div>
       <div id="saccoMsg" class="msg"></div>
     </div>
@@ -255,10 +259,10 @@
 
 <dialog id="deleteSaccoDialog" aria-labelledby="deleteSaccoTitle" aria-describedby="deleteSaccoDescription">
   <div class="delete-confirm-content">
-    <h2 id="deleteSaccoTitle">Confirm SACCO deletion</h2>
+    <h2 id="deleteSaccoTitle">Confirm SACCO archive</h2>
     <p id="deleteSaccoDescription"></p>
     <form method="dialog" class="delete-dialog-actions">
-      <button type="submit" value="yes" class="danger">Yes, delete</button>
+      <button type="submit" value="yes" class="danger">Yes, archive</button>
       <button type="submit" value="no" class="secondary" autofocus>No, keep it</button>
     </form>
   </div>
@@ -269,6 +273,7 @@ let TOKEN = sessionStorage.getItem('saccoAdminToken');
 let editingMetricId = null;
 let selectedMetricSacco = null;
 let metricSearchVersion = 0;
+let showingArchivedSaccos = false;
 
 function populateYearSelect(id){
   const select = document.getElementById(id);
@@ -336,7 +341,7 @@ function authHeaders(){
                : { 'Content-Type': 'application/json' };
 }
 
-function renderSaccos(list, updateOverview = false){
+function renderSaccos(list, updateOverview = false, archived = showingArchivedSaccos){
   const tbody = document.querySelector('#saccoTable tbody');
   const preview = document.querySelector('#previewTable tbody');
   tbody.replaceChildren();
@@ -345,7 +350,7 @@ function renderSaccos(list, updateOverview = false){
     document.getElementById('directoryCount').textContent = `${list.length} records loaded`;
   }
   if(!list.length){
-    tbody.innerHTML = '<tr><td colspan="5"><small class="hint">No SACCOs found.</small></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6"><small class="hint">No SACCOs found.</small></td></tr>';
     if(updateOverview) preview.innerHTML = '<tr><td colspan="2">No SACCOs found.</td></tr>';
     return;
   }
@@ -355,26 +360,31 @@ function renderSaccos(list, updateOverview = false){
       const cell = tr.insertCell();
       cell.textContent = value;
     }
+    tr.insertCell().textContent = archived ? 'Archived' : 'Active';
     const action = tr.insertCell();
-    const edit = document.createElement('button');
-    edit.className = 'secondary';
-    edit.textContent = 'Edit';
-    edit.addEventListener('click', () => { fillEdit(s.id, s.name, s.county || ''); showView('saccos'); });
-    const metrics = document.createElement('button');
-    metrics.className = 'secondary';
-    metrics.textContent = 'Metrics';
-    metrics.style.marginLeft = '7px';
-    metrics.addEventListener('click', () => {
-      document.getElementById('metricSaccoId').value = s.id;
-      showView('metrics');
-      loadMetrics();
-    });
-    action.append(edit, metrics);
+    if(archived){
+      action.textContent = '—';
+    }else{
+      const edit = document.createElement('button');
+      edit.className = 'secondary';
+      edit.textContent = 'Edit';
+      edit.addEventListener('click', () => { fillEdit(s.id, s.name, s.county || ''); showView('saccos'); });
+      const metrics = document.createElement('button');
+      metrics.className = 'secondary';
+      metrics.textContent = 'Metrics';
+      metrics.style.marginLeft = '7px';
+      metrics.addEventListener('click', () => {
+        document.getElementById('metricSaccoId').value = s.id;
+        showView('metrics');
+        loadMetrics();
+      });
+      action.append(edit, metrics);
+    }
     const deleteCell = tr.insertCell();
     const remove = document.createElement('button');
-    remove.className = 'danger';
-    remove.textContent = 'Delete';
-    remove.addEventListener('click', () => deleteSacco(s.id, s.name));
+    remove.className = archived ? 'secondary' : 'danger';
+    remove.textContent = archived ? 'Restore' : 'Archive';
+    remove.addEventListener('click', () => archived ? restoreSacco(s.id) : deleteSacco(s.id, s.name));
     deleteCell.appendChild(remove);
     tbody.appendChild(tr);
   }
@@ -395,6 +405,9 @@ function fillEdit(id, name, county){
 }
 
 async function loadAllSaccos(){
+  showingArchivedSaccos = false;
+  document.getElementById('activeSaccosButton').classList.remove('secondary');
+  document.getElementById('archivedSaccosButton').classList.add('secondary');
   try{
     const r = await fetch(base() + '/saccos?limit=200');
     if(!r.ok) throw new Error();
@@ -406,12 +419,25 @@ async function loadAllSaccos(){
   }
 }
 
+async function loadArchivedSaccos(){
+  showingArchivedSaccos = true;
+  document.getElementById('activeSaccosButton').classList.add('secondary');
+  document.getElementById('archivedSaccosButton').classList.remove('secondary');
+  try{
+    const r = await fetch(base() + '/saccos/archived?limit=200', {headers: authHeaders()});
+    if(!r.ok) throw new Error();
+    renderSaccos(await r.json(), false, true);
+  }catch(error){ showMsg('saccoMsg', 'Could not load archived SACCOs.', false); }
+}
+
 async function searchSaccos(){
   const q = document.getElementById('searchQ').value.trim();
   try{
-    const r = await fetch(base() + '/saccos?limit=200&q=' + encodeURIComponent(q));
+    const endpoint = showingArchivedSaccos ? '/saccos/archived' : '/saccos';
+    const r = await fetch(base() + endpoint + '?limit=200&q=' + encodeURIComponent(q),
+      {headers: showingArchivedSaccos ? authHeaders() : {}});
     if(!r.ok) throw new Error();
-    renderSaccos(await r.json());
+    renderSaccos(await r.json(), false, showingArchivedSaccos);
   }catch(error){ showMsg('saccoMsg', 'Search failed. Check the API connection.', false); }
 }
 
@@ -441,17 +467,28 @@ async function deleteSacco(id = document.getElementById('editId').value.trim(), 
   const confirmed = await confirmSaccoDelete(label);
   if(!confirmed) return;
   const r = await fetch(base() + '/saccos/' + id, { method:'DELETE', headers: authHeaders() });
-  if(r.status === 204){ showMsg('saccoMsg', 'Deleted.', true); loadAllSaccos(); }
+  if(r.status === 204){ showMsg('saccoMsg', 'SACCO archived. Its financial data is preserved.', true); loadAllSaccos(); }
   else{
     const data = await r.json().catch(()=>({}));
-    showMsg('saccoMsg', data.detail || 'Delete failed (are you logged in as admin?)', false);
+    showMsg('saccoMsg', data.detail || 'Archive failed (are you logged in as admin?)', false);
   }
+}
+
+async function restoreSacco(id){
+  try{
+    const response = await fetch(base() + '/saccos/' + id + '/restore', {
+      method:'POST', headers:authHeaders()
+    });
+    if(!response.ok) throw new Error();
+    showMsg('saccoMsg', 'SACCO restored to the active directory.', true);
+    loadArchivedSaccos();
+  }catch(error){ showMsg('saccoMsg', 'Could not restore this SACCO.', false); }
 }
 
 function confirmSaccoDelete(label){
   const dialog = document.getElementById('deleteSaccoDialog');
   document.getElementById('deleteSaccoDescription').textContent =
-    `Are you sure you want to delete ${label}? This will also permanently remove its metrics.`;
+    `Archive ${label}? It will leave the active directory, but its record and financial data will be kept and can be restored.`;
   dialog.returnValue = 'no';
   return new Promise(resolve => {
     dialog.addEventListener('close', () => resolve(dialog.returnValue === 'yes'), {once:true});
