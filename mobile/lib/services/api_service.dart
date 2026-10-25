@@ -94,12 +94,24 @@ class ApiService {
         .toList(growable: false);
   }
 
-  static Future<SaccoScore> getScore(int saccoId) async {
-    final json = await ApiClient.get('/saccos/$saccoId/score');
+  /// One year's score. Without a year, the API uses the latest year with figures.
+  static Future<SaccoScore> getScore(int saccoId, {int? year}) async {
+    final json = await ApiClient.get('/saccos/$saccoId/score', query: {'year': ?year});
     if (json is! Map<String, dynamic>) {
       throw const FormatException('Unexpected SACCO score response');
     }
     return SaccoScore.fromJson(json);
+  }
+
+  /// Every year that has figures, oldest first.
+  static Future<List<TrendPoint>> getTrend(int saccoId) async {
+    final json = await ApiClient.get('/saccos/$saccoId/trend');
+    if (json is! List) {
+      throw const FormatException('Unexpected trend response');
+    }
+    return json
+        .map((item) => TrendPoint.fromJson(Map<String, dynamic>.from(item as Map)))
+        .toList(growable: false);
   }
 
   static Future<Map<String, dynamic>> compareSaccos(List<int> saccoIds) async {

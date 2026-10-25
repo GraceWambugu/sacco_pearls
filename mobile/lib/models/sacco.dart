@@ -3,7 +3,7 @@ class SaccoRecord {
 
   final int id;
   final String name;
-  final String? county;
+  final String? county; // often missing in SASRA's directory
 
   factory SaccoRecord.fromJson(Map<String, dynamic> json) {
     return SaccoRecord(
@@ -14,18 +14,37 @@ class SaccoRecord {
   }
 }
 
+/// One SACCO's PEARLS-aligned score for one year, as returned by GET /saccos/{id}/score.
 class SaccoScore {
   const SaccoScore({
     required this.year,
     required this.composite,
     required this.rating,
     required this.dimensions,
+    this.dimensionsScored = 0,
+    this.dimensionsTotal = 6,
+    this.overrides = const [],
+    this.flags = const [],
   });
 
   final int year;
+
+  /// 0-100, or null when nothing could be scored.
   final num? composite;
+
+  /// "Green", "Amber", "Red", or "Unrated" when the API sends null.
   final String rating;
+
+  /// Always P, E, A, R, L, S in that order.
   final Map<String, PearlsDimension> dimensions;
+  final int dimensionsScored;
+  final int dimensionsTotal;
+
+  /// Rules that changed the rating, e.g. "Capped at Amber: ...".
+  final List<String> overrides;
+
+  /// Data notes: "stale", "anomaly" or "limited".
+  final List<String> flags;
 
   factory SaccoScore.fromJson(Map<String, dynamic> json) {
     final rawDimensions = json['dimensions'] as Map<String, dynamic>? ?? const {};
@@ -39,6 +58,10 @@ class SaccoScore {
           PearlsDimension.fromJson(Map<String, dynamic>.from(value as Map)),
         ),
       ),
+      dimensionsScored: json['dimensions_scored'] as int? ?? 0,
+      dimensionsTotal: json['dimensions_total'] as int? ?? 6,
+      overrides: _strings(json['overrides']),
+      flags: _strings(json['flags']),
     );
   }
 }
@@ -57,6 +80,8 @@ class PearlsDimension {
   final String name;
   final bool scored;
   final num? score;
+
+  /// Why the dimension is not scored (null when it is scored).
   final String? reason;
   final List<PearlsIndicator> indicators;
 
@@ -81,12 +106,18 @@ class PearlsIndicator {
     required this.value,
     required this.unit,
     required this.band,
+    this.rule,
   });
 
   final String label;
   final num? value;
   final String? unit;
+
+  /// "Green", "Amber", "Red", or null when the figure is missing.
   final String? band;
+
+  /// How the band is decided, e.g. "SASRA minimum 10%; Green from 12.5%".
+  final String? rule;
 
   factory PearlsIndicator.fromJson(Map<String, dynamic> json) {
     return PearlsIndicator(
@@ -94,6 +125,53 @@ class PearlsIndicator {
       value: json['value'] as num?,
       unit: json['unit'] as String?,
       band: json['band'] as String?,
+      rule: json['rule'] as String?,
     );
   }
 }
+
+/// One year of GET /saccos/{id}/trend: the score plus key figures.
+class TrendPoint {
+  const TrendPoint({
+    required this.year,
+    this.composite,
+    this.rating,
+    this.dimensionScores = const {},
+    this.totalAssets,
+    this.totalDeposits,
+    this.grossLoans,
+    this.cca,
+    this.nplRatio,
+    this.dataStale = false,
+  });
+
+  final int year;
+  final num? composite;
+  final String? rating;
+  final Map<String, num?> dimensionScores; // E, A, R, S
+  final num? totalAssets; // KES billions
+  final num? totalDeposits;
+  final num? grossLoans;
+  final num? cca; // percent
+  final num? nplRatio;
+  final bool dataStale;
+
+  factory TrendPoint.fromJson(Map<String, dynamic> json) {
+    final scores = json['dimension_scores'] as Map<String, dynamic>? ?? const {};
+    return TrendPoint(
+      year: json['year'] as int,
+      composite: json['composite'] as num?,
+      rating: json['rating'] as String?,
+      dimensionScores: scores.map((code, value) => MapEntry(code, value as num?)),
+      totalAssets: json['total_assets'] as num?,
+      totalDeposits: json['total_deposits'] as num?,
+      grossLoans: json['gross_loans'] as num?,
+      cca: json['cca'] as num?,
+      nplRatio: json['npl_ratio'] as num?,
+      dataStale: json['data_stale'] as bool? ?? false,
+    );
+  }
+}
+
+List<String> _strings(dynamic value) =>
+    (value as List<dynamic>? ?? const []).map((item) => item.toString()).toList(growable: false);
