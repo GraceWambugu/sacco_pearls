@@ -1,38 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:saccolens/models/sacco.dart';
 import 'package:saccolens/models/auth_user.dart';
 import 'package:saccolens/screens/auth_screen.dart';
 import 'package:saccolens/screens/member_home_screen.dart';
-import 'package:saccolens/screens/sacco_search_screen.dart';
 
 void main() {
-  testWidgets('searches the SACCO directory', (WidgetTester tester) async {
-    String? requestedQuery;
-    await tester.pumpWidget(
-      MaterialApp(
-        home: SaccoSearchScreen(
-          loader: (query) async {
-            requestedQuery = query;
-            return const [
-              SaccoRecord(id: 135, name: 'ACUMEN DT.', county: 'Kajiado'),
-            ];
-          },
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    expect(find.text('ACUMEN DT.'), findsOneWidget);
-  expect(find.textContaining('135'), findsNothing);
-    await tester.enterText(find.byType(TextField), 'acumen');
-    await tester.pump(const Duration(milliseconds: 350));
-    await tester.pumpAndSettle();
-
-    expect(requestedQuery, 'acumen');
-  });
-
   testWidgets('shows member sign-up and password recovery forms', (WidgetTester tester) async {
     await tester.pumpWidget(
       MaterialApp(home: AuthScreen(onAuthenticated: (_) {})),

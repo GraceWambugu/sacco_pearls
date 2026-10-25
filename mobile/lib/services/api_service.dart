@@ -79,10 +79,12 @@ class ApiService {
 
   // ---- Public data (no sign-in needed) ----
 
-  static Future<List<SaccoRecord>> searchSaccos(String query) async {
+  /// Name search, optionally limited to one county. 200 covers every DT-SACCO.
+  static Future<List<SaccoRecord>> searchSaccos(String query, {String? county}) async {
     final json = await ApiClient.get('/saccos', query: {
       'limit': 200,
       if (query.trim().isNotEmpty) 'q': query.trim(),
+      'county': ?county, // the "?" leaves this key out when no county is chosen
     });
     if (json is! List) {
       throw const FormatException('Unexpected SACCO list response');

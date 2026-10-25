@@ -42,7 +42,9 @@ class _CompareScreenState extends State<CompareScreen> {
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 300), () {
       if (!mounted) return;
-      setState(() => _directory = ApiService.searchSaccos(value.trim()));
+      setState(() {
+        _directory = ApiService.searchSaccos(value.trim());
+      });
     });
   }
 
