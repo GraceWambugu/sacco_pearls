@@ -1,12 +1,18 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../models/sacco.dart';
+import '../providers/compare_provider.dart';
 import '../services/api_service.dart';
+import '../theme/app_colors.dart';
 
 class CompareScreen extends StatefulWidget {
-  const CompareScreen({super.key});
+  const CompareScreen({super.key, this.onBrowse});
+
+  /// Opens the Search tab (used by the empty-state button).
+  final VoidCallback? onBrowse;
 
   @override
   State<CompareScreen> createState() => _CompareScreenState();
@@ -16,9 +22,8 @@ class _CompareScreenState extends State<CompareScreen> {
   final _searchController = TextEditingController();
   late Future<List<SaccoRecord>> _directory;
   Timer? _debounce;
-  final Set<int> _selectedIds = {};
-  String _query = '';
   Future<Map<String, dynamic>>? _comparison;
+  String _comparedIds = ''; // which picks the result above belongs to
 
   @override
   void initState() {
@@ -37,42 +42,55 @@ class _CompareScreenState extends State<CompareScreen> {
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 300), () {
       if (!mounted) return;
-      setState(() {
-        _query = value.trim();
-        _directory = ApiService.searchSaccos(_query);
-      });
+      setState(() => _directory = ApiService.searchSaccos(value.trim()));
     });
   }
 
-  void _toggle(SaccoRecord sacco, bool selected) {
-    if (selected && _selectedIds.length == 3) {
+  void _toggle(SaccoRecord sacco) {
+    final picks = context.read<CompareProvider>();
+    if (picks.contains(sacco.id)) {
+      picks.remove(sacco.id);
+    } else if (!picks.add(sacco)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Compare up to three SACCOs at a time.')),
       );
-      return;
     }
-    setState(() {
-      if (selected) {
-        _selectedIds.add(sacco.id);
-      } else {
-        _selectedIds.remove(sacco.id);
-      }
-      _comparison = null;
-    });
   }
 
-  void _compare() {
+  void _compare(List<int> ids) {
     setState(() {
-      _comparison = ApiService.compareSaccos(_selectedIds.toList());
+      _comparedIds = ids.join(',');
+      _comparison = ApiService.compareSaccos(ids);
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    final picks = context.watch<CompareProvider>();
+    final ids = picks.selected.map((s) => s.id).toList();
+    // A result only stays on screen while it matches the current picks.
+    final showResult = _comparison != null && _comparedIds == ids.join(',');
+
     return Scaffold(
       appBar: AppBar(title: const Text('Compare SACCOs')),
       body: Column(
         children: [
+          if (picks.count > 0)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 4,
+                children: [
+                  for (final sacco in picks.selected)
+                    InputChip(
+                      label: Text(sacco.name),
+                      onDeleted: () => picks.remove(sacco.id),
+                      deleteButtonTooltipMessage: 'Remove ${sacco.name}',
+                    ),
+                ],
+              ),
+            ),
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
             child: TextField(
@@ -82,7 +100,7 @@ class _CompareScreenState extends State<CompareScreen> {
                 hintText: 'Find SACCOs to compare',
                 prefixIcon: const Icon(Icons.search_rounded),
                 filled: true,
-                fillColor: Colors.white,
+                fillColor: AppColors.surface,
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
               ),
             ),
@@ -95,7 +113,19 @@ class _CompareScreenState extends State<CompareScreen> {
                   return const Center(child: CircularProgressIndicator());
                 }
                 if (snapshot.hasError) {
-                  return Center(child: Text('Directory unavailable: ${snapshot.error}'));
+                  return Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text('${snapshot.error}', textAlign: TextAlign.center),
+                        TextButton.icon(
+                          onPressed: () => _search(_searchController.text),
+                          icon: const Icon(Icons.refresh_rounded),
+                          label: const Text('Try again'),
+                        ),
+                      ],
+                    ),
+                  );
                 }
                 final saccos = snapshot.data ?? const <SaccoRecord>[];
                 if (saccos.isEmpty) return const Center(child: Text('No SACCOs found.'));
@@ -103,13 +133,12 @@ class _CompareScreenState extends State<CompareScreen> {
                   itemCount: saccos.length,
                   itemBuilder: (context, index) {
                     final sacco = saccos[index];
-                    final selected = _selectedIds.contains(sacco.id);
                     return CheckboxListTile(
-                      value: selected,
-                      activeColor: const Color(0xFF235C48),
+                      value: picks.contains(sacco.id),
+                      activeColor: AppColors.forest,
                       title: Text(sacco.name),
                       subtitle: Text(sacco.county ?? 'County not listed'),
-                      onChanged: (value) => _toggle(sacco, value ?? false),
+                      onChanged: (_) => _toggle(sacco),
                     );
                   },
                 );
@@ -123,13 +152,15 @@ class _CompareScreenState extends State<CompareScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  if (_comparison != null) _ComparisonResult(future: _comparison!),
+                  if (showResult) _ComparisonResult(future: _comparison!),
                   SizedBox(
                     height: 48,
                     child: FilledButton.icon(
-                      onPressed: _selectedIds.length < 2 ? null : _compare,
+                      onPressed: picks.canCompare ? () => _compare(ids) : null,
                       icon: const Icon(Icons.compare_arrows_rounded),
-                      label: Text('Compare ${_selectedIds.length} selected'),
+                      label: Text(picks.canCompare
+                          ? 'Compare ${picks.count} SACCOs'
+                          : 'Pick ${2 - picks.count} more to compare'),
                     ),
                   ),
                 ],
@@ -155,7 +186,7 @@ class _ComparisonResult extends StatelessWidget {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Padding(
             padding: EdgeInsets.all(12),
-            child: LinearProgressIndicator(color: Color(0xFF126B5B)),
+            child: LinearProgressIndicator(color: AppColors.forest),
           );
         }
         if (snapshot.hasError) {
@@ -163,7 +194,7 @@ class _ComparisonResult extends StatelessWidget {
             padding: const EdgeInsets.all(8),
             child: Text(
               snapshot.error.toString(),
-              style: const TextStyle(color: Color(0xFFAD4539), fontSize: 12),
+              style: const TextStyle(color: AppColors.red, fontSize: 12),
             ),
           );
         }
@@ -178,7 +209,7 @@ class _ComparisonResult extends StatelessWidget {
                   dense: true,
                   title: Text(item['sacco']['name'] as String),
                   subtitle: Text('Composite ${item['composite'] ?? '—'}  ·  ${item['rating'] ?? 'Unrated'}'),
-                  trailing: const Icon(Icons.check_circle_outline, color: Color(0xFF24866B)),
+                  trailing: const Icon(Icons.check_circle_outline, color: AppColors.green),
                 ),
             ],
           ),

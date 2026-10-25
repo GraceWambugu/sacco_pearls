@@ -2,57 +2,13 @@ import 'package:flutter/material.dart';
 
 import '../models/auth_user.dart';
 import '../models/sacco.dart';
-import '../services/api_service.dart';
-import 'compare_screen.dart';
 import 'sacco_profile_screen.dart';
-import 'sacco_search_screen.dart';
-import 'watchlist_screen.dart';
 import '../theme/app_colors.dart';
 
-class MemberShell extends StatefulWidget {
-  const MemberShell({super.key, required this.account, required this.onLogout});
-
-  final MemberAccount account;
-  final Future<void> Function() onLogout;
-
-  @override
-  State<MemberShell> createState() => _MemberShellState();
-}
-
-class _MemberShellState extends State<MemberShell> {
-  int _selectedIndex = 0;
-  late final _directory = ApiService.searchSaccos('');
-
-  @override
-  Widget build(BuildContext context) {
-    final pages = [
-      MemberHomeScreen(
-        account: widget.account,
-        onNavigate: (index) => setState(() => _selectedIndex = index),
-        directory: _directory,
-      ),
-      const SaccoSearchScreen(),
-      const WatchlistScreen(),
-      MemberAccountScreen(account: widget.account, onLogout: widget.onLogout),
-    ];
-
-    return Scaffold(
-      body: IndexedStack(index: _selectedIndex, children: pages),
-      bottomNavigationBar: NavigationBar(
-        backgroundColor: AppColors.surface,
-        indicatorColor: AppColors.lime,
-        selectedIndex: _selectedIndex,
-        onDestinationSelected: (index) => setState(() => _selectedIndex = index),
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home_rounded), label: 'Home'),
-          NavigationDestination(icon: Icon(Icons.search_rounded), label: 'Directory'),
-          NavigationDestination(icon: Icon(Icons.bookmark_border_rounded), selectedIcon: Icon(Icons.bookmark_rounded), label: 'Saved'),
-          NavigationDestination(icon: Icon(Icons.person_outline_rounded), selectedIcon: Icon(Icons.person_rounded), label: 'Account'),
-        ],
-      ),
-    );
-  }
-}
+// Tab numbers, matching AppShell (Home 0, Search 1, Compare 2, Saved 3).
+const _searchTab = 1;
+const _compareTab = 2;
+const _savedTab = 3;
 
 class MemberHomeScreen extends StatelessWidget {
   const MemberHomeScreen({
@@ -60,18 +16,20 @@ class MemberHomeScreen extends StatelessWidget {
     required this.account,
     required this.onNavigate,
     required this.directory,
+    this.onOpenAccount,
   });
 
-  final MemberAccount account;
+  /// Null when nobody is signed in; the app still works, saving just needs sign-in.
+  final MemberAccount? account;
   final ValueChanged<int> onNavigate;
   final Future<List<SaccoRecord>> directory;
+  final VoidCallback? onOpenAccount;
 
   @override
   Widget build(BuildContext context) {
-    final firstName = account.fullName.trim().split(RegExp(r'\s+')).first;
+    final firstName = account?.fullName.trim().split(RegExp(r'\s+')).first;
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: AppColors.canvas,
         title: const Text(
           'SACCOLens',
           style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w800),
@@ -81,11 +39,17 @@ class MemberHomeScreen extends StatelessWidget {
             tooltip: 'Explain rating colors',
             onPressed: () => showRatingGuide(context),
             style: IconButton.styleFrom(
-              backgroundColor: AppColors.limeSoft,
-              foregroundColor: AppColors.charcoal,
+              backgroundColor: AppColors.accentSoft,
+              foregroundColor: AppColors.forestDark,
             ),
             icon: const Icon(Icons.info_outline_rounded),
           ),
+          if (onOpenAccount != null)
+            IconButton(
+              tooltip: account == null ? 'Sign in' : 'Account',
+              onPressed: onOpenAccount,
+              icon: Icon(account == null ? Icons.login_rounded : Icons.person_rounded),
+            ),
           const SizedBox(width: 8),
         ],
       ),
@@ -93,7 +57,7 @@ class MemberHomeScreen extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
         children: [
           Text(
-            'Good day, $firstName',
+            firstName == null ? 'Welcome' : 'Good day, $firstName',
             style: const TextStyle(
               color: AppColors.ink,
               fontSize: 29,
@@ -106,7 +70,7 @@ class MemberHomeScreen extends StatelessWidget {
             style: TextStyle(color: AppColors.muted, fontSize: 14),
           ),
           const SizedBox(height: 24),
-          _DirectorySummary(onTap: () => onNavigate(1), directory: directory),
+          _DirectorySummary(onTap: () => onNavigate(_searchTab), directory: directory),
           const SizedBox(height: 28),
           const Text(
             'YOUR TOOLS',
@@ -129,21 +93,19 @@ class MemberHomeScreen extends StatelessWidget {
                 icon: Icons.search_rounded,
                 title: 'Find a SACCO',
                 detail: 'Browse directory',
-                background: AppColors.charcoal,
+                background: AppColors.forestDark,
                 foreground: Colors.white,
-                iconBackground: AppColors.lime,
-                onTap: () => onNavigate(1),
+                iconBackground: AppColors.accent,
+                onTap: () => onNavigate(_searchTab),
               ),
               _HomeActionTile(
                 icon: Icons.compare_arrows_rounded,
                 title: 'Compare',
                 detail: 'Choose up to three',
-                background: AppColors.lime,
-                foreground: AppColors.charcoal,
+                background: AppColors.accent,
+                foreground: AppColors.forestDark,
                 iconBackground: AppColors.surface,
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(builder: (_) => const CompareScreen()),
-                ),
+                onTap: () => onNavigate(_compareTab),
               ),
               _HomeActionTile(
                 icon: Icons.bookmark_border_rounded,
@@ -151,17 +113,17 @@ class MemberHomeScreen extends StatelessWidget {
                 detail: 'Your shortlist',
                 background: AppColors.surface,
                 foreground: AppColors.ink,
-                iconBackground: AppColors.limeSoft,
-                onTap: () => onNavigate(2),
+                iconBackground: AppColors.accentSoft,
+                onTap: () => onNavigate(_savedTab),
               ),
               _HomeActionTile(
                 icon: Icons.person_outline_rounded,
-                title: 'Account',
-                detail: 'Member settings',
+                title: account == null ? 'Sign in' : 'Account',
+                detail: account == null ? 'Needed to save SACCOs' : 'Member settings',
                 background: AppColors.surface,
                 foreground: AppColors.ink,
-                iconBackground: AppColors.limeSoft,
-                onTap: () => onNavigate(3),
+                iconBackground: AppColors.accentSoft,
+                onTap: onOpenAccount ?? () {},
               ),
             ],
           ),
@@ -211,7 +173,7 @@ class MemberHomeScreen extends StatelessWidget {
             style: TextStyle(color: AppColors.muted, fontSize: 12),
           ),
           const SizedBox(height: 24),
-          _PopularSaccos(onOpenDirectory: () => onNavigate(1), directory: directory),
+          _PopularSaccos(onOpenDirectory: () => onNavigate(_searchTab), directory: directory),
         ],
       ),
     );
@@ -236,12 +198,12 @@ class _DirectorySummary extends StatelessWidget {
           child: Ink(
             padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
-              color: AppColors.charcoal,
+              color: AppColors.forestDark,
               borderRadius: BorderRadius.circular(8),
             ),
             child: Row(
               children: [
-                const Icon(Icons.account_balance_rounded, color: AppColors.lime, size: 30),
+                const Icon(Icons.account_balance_rounded, color: AppColors.accent, size: 30),
                 const SizedBox(width: 15),
                 Expanded(
                   child: Column(
@@ -263,7 +225,7 @@ class _DirectorySummary extends StatelessWidget {
                     ],
                   ),
                 ),
-                const Icon(Icons.arrow_forward_rounded, color: AppColors.lime),
+                const Icon(Icons.arrow_forward_rounded, color: AppColors.accent),
               ],
             ),
           ),
@@ -311,7 +273,7 @@ class _HomeActionTile extends StatelessWidget {
                   color: iconBackground,
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(icon, color: AppColors.charcoal, size: 19),
+                child: Icon(icon, color: AppColors.forestDark, size: 19),
               ),
               const SizedBox(width: 9),
               Expanded(
@@ -408,7 +370,7 @@ class _PopularSaccos extends StatelessWidget {
                   child: Text(
                     'From the directory',
                     style: TextStyle(
-                      color: Color(0xFF18312D),
+                      color: AppColors.ink,
                       fontSize: 18,
                       fontWeight: FontWeight.w800,
                     ),
@@ -455,11 +417,11 @@ class MemberAccountScreen extends StatelessWidget {
         children: [
           CircleAvatar(
             radius: 34,
-            backgroundColor: const Color(0xFFDCEFE9),
+            backgroundColor: AppColors.accentSoft,
             child: Text(
               account.fullName.isEmpty ? 'M' : account.fullName[0].toUpperCase(),
               style: const TextStyle(
-                color: Color(0xFF126B5B),
+                color: AppColors.forest,
                 fontSize: 24,
                 fontWeight: FontWeight.w800,
               ),
@@ -470,7 +432,7 @@ class MemberAccountScreen extends StatelessWidget {
             account.fullName,
             textAlign: TextAlign.center,
             style: const TextStyle(
-              color: Color(0xFF18312D),
+              color: AppColors.ink,
               fontSize: 22,
               fontWeight: FontWeight.w800,
             ),
@@ -478,7 +440,7 @@ class MemberAccountScreen extends StatelessWidget {
           Text(
             account.email,
             textAlign: TextAlign.center,
-            style: const TextStyle(color: Color(0xFF638078)),
+            style: const TextStyle(color: AppColors.muted),
           ),
           const SizedBox(height: 30),
           ListTile(
@@ -528,9 +490,9 @@ void showRatingGuide(BuildContext context) {
               style: TextStyle(color: AppColors.muted),
             ),
             const SizedBox(height: 16),
-            const _RatingLegendRow(color: Color(0xFF24866B), label: 'Green', detail: '75 or higher, unless a regulatory breach caps the rating.'),
-            const _RatingLegendRow(color: Color(0xFFB78020), label: 'Amber', detail: '50 to under 75, or capped for a regulatory breach.'),
-            const _RatingLegendRow(color: Color(0xFFC44F43), label: 'Red', detail: 'Below 50, negative core capital, or NPL above 25%.'),
+            const _RatingLegendRow(color: AppColors.green, label: 'Green', detail: '75 or higher, unless a regulatory breach caps the rating.'),
+            const _RatingLegendRow(color: AppColors.amber, label: 'Amber', detail: '50 to under 75, or capped for a regulatory breach.'),
+            const _RatingLegendRow(color: AppColors.red, label: 'Red', detail: 'Below 50, negative core capital, or NPL above 25%.'),
             const SizedBox(height: 12),
             const Text(
               'Indicator colors use their own thresholds. “Not scored” means a report does not publish that SACCO-level data; it is not the same as Red.',

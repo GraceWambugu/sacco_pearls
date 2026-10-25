@@ -76,12 +76,12 @@ class _SaccoSearchScreenState extends State<SaccoSearchScreen> {
                     width: 44,
                     height: 44,
                     decoration: BoxDecoration(
-                      color: AppColors.charcoal,
+                      color: AppColors.forestDark,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Icon(
                       Icons.account_balance_rounded,
-                      color: AppColors.lime,
+                      color: AppColors.accent,
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -252,7 +252,7 @@ class _SaccoSearchScreenState extends State<SaccoSearchScreen> {
                           width: 48,
                           height: 48,
                           decoration: BoxDecoration(
-                            color: AppColors.limeSoft,
+                            color: AppColors.accentSoft,
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: const Icon(

@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../models/sacco.dart';
+import '../providers/auth_provider.dart';
+import '../providers/compare_provider.dart';
+import '../providers/saved_provider.dart';
 import '../services/api_service.dart';
 import '../theme/app_colors.dart';
+import 'app_shell.dart';
 
 class SaccoProfileScreen extends StatefulWidget {
   const SaccoProfileScreen({super.key, required this.sacco});
@@ -15,41 +20,30 @@ class SaccoProfileScreen extends StatefulWidget {
 
 class _SaccoProfileScreenState extends State<SaccoProfileScreen> {
   late Future<SaccoScore> _score;
-  bool _isSaved = false;
-  bool _savedStateLoading = true;
   bool _saving = false;
 
   @override
   void initState() {
     super.initState();
     _score = ApiService.getScore(widget.sacco.id);
-    _loadSavedState();
-  }
-
-  Future<void> _loadSavedState() async {
-    try {
-      final lists = await ApiService.getWatchlists();
-      final saved = lists
-          .where((list) => list.name == 'My SACCOs')
-          .expand((list) => list.saccos)
-          .any((sacco) => sacco.id == widget.sacco.id);
-      if (mounted) setState(() => _isSaved = saved);
-    } catch (_) {
-      // Keep the score page usable if saved-list loading fails.
-    } finally {
-      if (mounted) setState(() => _savedStateLoading = false);
-    }
   }
 
   Future<void> _toggleSaved() async {
+    // Saving needs an account; viewing does not.
+    if (!context.read<AuthProvider>().isSignedIn) {
+      await openAccount(context);
+      return;
+    }
+    final saved = context.read<SavedProvider>();
     setState(() => _saving = true);
     try {
-      await ApiService.setSaccoSaved(widget.sacco, saved: !_isSaved);
+      await saved.toggle(widget.sacco);
       if (!mounted) return;
-      setState(() => _isSaved = !_isSaved);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_isSaved ? 'Added to saved SACCOs' : 'Removed from saved SACCOs')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(saved.isSaved(widget.sacco.id)
+            ? 'Added to saved SACCOs'
+            : 'Removed from saved SACCOs'),
+      ));
     } on ApiException catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -58,6 +52,23 @@ class _SaccoProfileScreenState extends State<SaccoProfileScreen> {
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+  void _toggleCompare() {
+    final picks = context.read<CompareProvider>();
+    final String message;
+    if (picks.contains(widget.sacco.id)) {
+      picks.remove(widget.sacco.id);
+      message = 'Removed from compare';
+    } else if (picks.add(widget.sacco)) {
+      message = 'Added to compare (${picks.count} of ${CompareProvider.maxSaccos}). '
+          'Open the Compare tab to see them side by side.';
+    } else {
+      message = 'Compare already has three SACCOs. Remove one first.';
+    }
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 
   void _retry() {
@@ -71,7 +82,7 @@ class _SaccoProfileScreenState extends State<SaccoProfileScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('SACCO profile'),
-        backgroundColor: AppColors.canvas,
+        backgroundColor: AppColors.paper,
       ),
       body: FutureBuilder<SaccoScore>(
         future: _score,
@@ -91,9 +102,11 @@ class _SaccoProfileScreenState extends State<SaccoProfileScreen> {
           return _ProfileContent(
             sacco: widget.sacco,
             score: snapshot.data!,
-            isSaved: _isSaved,
-            saving: _saving || _savedStateLoading,
+            isSaved: context.watch<SavedProvider>().isSaved(widget.sacco.id),
+            saving: _saving,
             onToggleSaved: _toggleSaved,
+            inCompare: context.watch<CompareProvider>().contains(widget.sacco.id),
+            onToggleCompare: _toggleCompare,
           );
         },
       ),
@@ -108,6 +121,8 @@ class _ProfileContent extends StatelessWidget {
     required this.isSaved,
     required this.saving,
     required this.onToggleSaved,
+    required this.inCompare,
+    required this.onToggleCompare,
   });
 
   final SaccoRecord sacco;
@@ -115,6 +130,8 @@ class _ProfileContent extends StatelessWidget {
   final bool isSaved;
   final bool saving;
   final VoidCallback onToggleSaved;
+  final bool inCompare;
+  final VoidCallback onToggleCompare;
 
   @override
   Widget build(BuildContext context) {
@@ -138,10 +155,24 @@ class _ProfileContent extends StatelessWidget {
         const SizedBox(height: 20),
         _ScoreSummary(score: score),
         const SizedBox(height: 12),
-        OutlinedButton.icon(
-          onPressed: saving ? null : onToggleSaved,
-          icon: Icon(isSaved ? Icons.bookmark_remove_outlined : Icons.bookmark_add_outlined),
-          label: Text(isSaved ? 'Remove from saved' : 'Save SACCO'),
+        Row(
+          children: [
+            Expanded(
+              child: FilledButton.icon(
+                onPressed: onToggleCompare,
+                icon: Icon(inCompare ? Icons.check_rounded : Icons.compare_arrows_rounded),
+                label: Text(inCompare ? 'In compare' : 'Add to compare'),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: saving ? null : onToggleSaved,
+                icon: Icon(isSaved ? Icons.bookmark_remove_outlined : Icons.bookmark_add_outlined),
+                label: Text(isSaved ? 'Saved' : 'Save SACCO'),
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 26),
         Row(
@@ -151,7 +182,7 @@ class _ProfileContent extends StatelessWidget {
               child: Text(
                 'PEARLS breakdown',
                 style: TextStyle(
-                  color: Color(0xFF18312D),
+                  color: AppColors.ink,
                   fontSize: 20,
                   fontWeight: FontWeight.w800,
                 ),
@@ -160,7 +191,7 @@ class _ProfileContent extends StatelessWidget {
             Text(
               '$scoredCount OF ${score.dimensions.length} SCORED',
               style: const TextStyle(
-                color: Color(0xFF638078),
+                color: AppColors.muted,
                 fontSize: 10,
                 fontWeight: FontWeight.w800,
               ),
@@ -188,7 +219,7 @@ class _ScoreSummary extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AppColors.charcoal,
+        color: AppColors.forestDark,
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
@@ -204,7 +235,7 @@ class _ScoreSummary extends StatelessWidget {
                   strokeWidth: 7,
                   strokeCap: StrokeCap.round,
                   backgroundColor: Colors.white24,
-                  color: AppColors.lime,
+                  color: AppColors.accent,
                 ),
                 Center(
                   child: Column(
@@ -292,7 +323,7 @@ class _DimensionTile extends StatelessWidget {
         height: 38,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: AppColors.limeSoft,
+          color: AppColors.accentSoft,
           borderRadius: BorderRadius.circular(8),
         ),
         child: Text(
@@ -339,7 +370,7 @@ class _DimensionTile extends StatelessWidget {
               alignment: Alignment.centerLeft,
               child: Text(
                 'No indicator data available.',
-                style: TextStyle(color: Color(0xFF638078), fontSize: 13),
+                style: TextStyle(color: AppColors.muted, fontSize: 13),
               ),
             ),
           ),
@@ -472,7 +503,7 @@ Color _bandColor(String band) {
     case 'red':
       return AppColors.red;
     default:
-      return const Color(0xFF6C7E79);
+      return AppColors.muted;
   }
 }
 

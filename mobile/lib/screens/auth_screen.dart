@@ -132,7 +132,7 @@ class _AuthScreenState extends State<AuthScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.canvas,
+      backgroundColor: AppColors.paper,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -151,7 +151,7 @@ class _AuthScreenState extends State<AuthScreen> {
                           color: AppColors.forest,
                           borderRadius: BorderRadius.circular(7),
                         ),
-                        child: const Icon(Icons.eco_rounded, color: AppColors.lime, size: 20),
+                        child: const Icon(Icons.eco_rounded, color: AppColors.accent, size: 20),
                       ),
                       const SizedBox(width: 10),
                       const Text(
@@ -303,8 +303,8 @@ class _AuthScreenState extends State<AuthScreen> {
                             child: FilledButton(
                               onPressed: _isLoading ? null : _submit,
                               style: FilledButton.styleFrom(
-                                backgroundColor: AppColors.lime,
-                                foregroundColor: AppColors.charcoal,
+                                backgroundColor: AppColors.accent,
+                                foregroundColor: AppColors.forestDark,
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(7),
                                 ),
@@ -314,7 +314,7 @@ class _AuthScreenState extends State<AuthScreen> {
                                       dimension: 20,
                                       child: CircularProgressIndicator(
                                         strokeWidth: 2,
-                                        color: AppColors.charcoal,
+                                        color: AppColors.forestDark,
                                       ),
                                     )
                                   : Text(
