@@ -119,3 +119,57 @@ def test_compare_validation(client):
     assert client.get("/compare", params={"ids": "a,b"}).status_code == 422                  # not numbers
     assert client.get("/compare", params={"ids": f"{alpha},9999"}).status_code == 404        # unknown SACCO
     assert client.get("/compare", params={"ids": f"{alpha},{beta}", "year": 2019}).status_code == 404
+
+
+def test_rankings_lists_best_first_for_the_latest_year(client):
+    alpha, beta, _ = seed(client)      # GAMMA has no 2024 figures, so it is not ranked
+    r = client.get("/rankings")        # public, no login
+    assert r.status_code == 200
+    body = r.json()
+    assert [x["sacco"]["id"] for x in body] == [alpha, beta]
+    assert body[0] == {"sacco": {"id": alpha, "name": "ALPHA", "county": "Nairobi"},
+                       "composite": 100.0, "rating": "Green", "dimensions_scored": 4}
+
+
+def test_rankings_respects_year_and_limit(client):
+    alpha, _, gamma = seed(client)
+    body = client.get("/rankings", params={"year": 2023, "limit": 2}).json()
+    assert len(body) == 2
+    assert {x["sacco"]["id"] for x in body} == {alpha, gamma}     # the two healthy SACCOs
+    assert client.get("/rankings", params={"limit": 0}).status_code == 422
+    assert client.get("/rankings", params={"year": 2019}).status_code == 404
+
+
+def test_rankings_skip_unrated_and_archived_saccos(client):
+    alpha, beta, _ = seed(client)
+    with client.Session() as s:
+        empty = Sacco(name="EMPTY")                  # a row with no figures cannot be rated
+        s.add(empty)
+        s.flush()
+        s.add(FinancialMetric(sacco_id=empty.id, data_year=2024))
+        s.get(Sacco, beta).is_archived = True
+        s.commit()
+    assert [x["sacco"]["id"] for x in client.get("/rankings").json()] == [alpha]
+
+
+def test_trend_is_oldest_first_and_matches_the_score_endpoint(client):
+    alpha, _, _ = seed(client)
+    body = client.get(f"/saccos/{alpha}/trend").json()
+    assert [p["year"] for p in body] == [2023, 2024]
+    assert body[0]["dimension_scores"]["S"] is None             # 2023 has no prior year to grow from
+    assert body[1]["dimension_scores"] == {"E": 100.0, "A": 100.0, "R": 100.0, "S": 100.0}
+    assert body[1]["total_assets"] == 11 and body[1]["npl_ratio"] == 3
+    for point in body:                                          # same answer as the Profile screen
+        score = client.get(f"/saccos/{alpha}/score", params={"year": point["year"]}).json()
+        assert (point["composite"], point["rating"]) == (score["composite"], score["rating"])
+
+
+def test_trend_not_found_and_empty(client):
+    seed(client)
+    assert client.get("/saccos/9999/trend").status_code == 404
+    with client.Session() as s:
+        new = Sacco(name="NO FIGURES YET")
+        s.add(new)
+        s.commit()
+        new_id = new.id
+    assert client.get(f"/saccos/{new_id}/trend").json() == []

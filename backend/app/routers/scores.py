@@ -86,3 +86,69 @@ def compare(
     ranking = [r["sacco"]["id"] for r in sorted(
         results, key=lambda r: (r["composite"] is None, -(r["composite"] or 0)))]
     return {"year": year, "results": results, "ranking": ranking}
+
+
+@router.get("/rankings")
+def rankings(
+    year: Optional[int] = Query(None, description="Data year; defaults to the latest year loaded"),
+    limit: int = Query(10, ge=1, le=50),
+    db: Session = Depends(get_db),
+):
+    """Top-scoring SACCOs for one year, best first. SACCOs that cannot be rated are left out."""
+    if year is None:
+        year = db.scalar(select(func.max(FinancialMetric.data_year)))
+        if year is None:
+            raise HTTPException(404, "No figures loaded yet")
+
+    # Two queries (this year and last year) instead of two per SACCO, so ranking ~180 SACCOs stays fast.
+    rows = db.execute(select(FinancialMetric, Sacco)
+                      .join(Sacco, Sacco.id == FinancialMetric.sacco_id)
+                      .where(FinancialMetric.data_year == year, Sacco.is_archived.is_(False))).all()
+    if not rows:
+        raise HTTPException(404, f"No figures for {year}")
+    prior_by_sacco = {m.sacco_id: m for m in db.scalars(
+        select(FinancialMetric).where(FinancialMetric.data_year == year - 1)).all()}
+
+    peer = _peer_median(db, year)
+    inflation = scoring.INFLATION.get(year)
+    ranked = []
+    for metric, sacco in rows:
+        result = scoring.score_sacco(metric, prior_by_sacco.get(sacco.id), peer, inflation)
+        if result["composite"] is None:
+            continue
+        ranked.append({"sacco": {"id": sacco.id, "name": sacco.name, "county": sacco.county},
+                       "composite": result["composite"], "rating": result["rating"],
+                       "dimensions_scored": result["dimensions_scored"]})
+    # Highest composite first; equal scores are listed by name so the order is stable.
+    ranked.sort(key=lambda r: (-r["composite"], r["sacco"]["name"]))
+    return ranked[:limit]
+
+
+@router.get("/saccos/{sacco_id}/trend")
+def trend(sacco_id: int, db: Session = Depends(get_db)):
+    """One SACCO's score and key figures for every year that has data, oldest first."""
+    sacco = db.get(Sacco, sacco_id)
+    if sacco is None:
+        raise HTTPException(404, "SACCO not found")
+
+    metrics = db.scalars(select(FinancialMetric).where(FinancialMetric.sacco_id == sacco_id)
+                         .order_by(FinancialMetric.data_year)).all()
+    by_year = {m.data_year: m for m in metrics}
+    points = []
+    for m in metrics:
+        # Each year is scored exactly as the Profile screen scores it: same peers, same prior year.
+        result = scoring.score_sacco(m, by_year.get(m.data_year - 1), _peer_median(db, m.data_year),
+                                     scoring.INFLATION.get(m.data_year))
+        points.append({
+            "year": m.data_year,
+            "composite": result["composite"],
+            "rating": result["rating"],
+            "dimension_scores": {code: result["dimensions"][code]["score"] for code in ("E", "A", "R", "S")},
+            "total_assets": m.total_assets,
+            "total_deposits": m.total_deposits,
+            "gross_loans": m.gross_loans,
+            "cca": m.cca,
+            "npl_ratio": m.npl_ratio,
+            "data_stale": m.data_stale,
+        })
+    return points
