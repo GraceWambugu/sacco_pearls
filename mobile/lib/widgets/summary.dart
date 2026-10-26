@@ -41,9 +41,22 @@ String _keyFigure(PearlsDimension dimension) {
   final weak = dimension.indicators.where((i) => i.band == 'Red' || i.band == 'Amber').toList();
   if (weak.isEmpty || weak.first.value == null) return '';
   final indicator = weak.first;
-  final label = indicator.key == 'npl_ratio' ? 'NPL' : indicator.label.toLowerCase();
+  final label = _shortNames[indicator.key] ?? indicator.label.toLowerCase();
   return ' ($label ${formatNumber(indicator.value!)}${indicator.unit ?? ''})';
 }
+
+/// Short names that read well inside a sentence.
+const _shortNames = {
+  'npl_ratio': 'NPL',
+  'cca': 'core capital/assets',
+  'ccd': 'core capital/deposits',
+  'ica': 'institutional capital/assets',
+  'ext_borrowing': 'external borrowing',
+  'income_yield': 'income/assets',
+  'asset_growth': 'asset growth',
+  'deposit_growth': 'deposit growth',
+  'loan_growth': 'loan growth',
+};
 
 String _joinAnd(List<String> items) => items.length == 1
     ? items.single
