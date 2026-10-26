@@ -74,7 +74,7 @@ class _AppShellState extends State<AppShell> {
       ),
       SaccoSearchScreen(rankingsLoader: () => _rankings, request: _directoryRequest),
       CompareScreen(onBrowse: () => _goTo(AppShell.searchTab)),
-      const TrendsScreen(),
+      TrendsScreen(rankings: _rankings),
     ];
 
     return Scaffold(
