@@ -129,7 +129,7 @@ def test_rankings_lists_best_first_for_the_latest_year(client):
     assert [x["sacco"]["id"] for x in body] == [alpha, beta]
     assert body[0] == {"sacco": {"id": alpha, "name": "ALPHA", "county": "Nairobi"},
                        "composite": 100.0, "rating": "Green", "dimensions_scored": 4,
-                       "total_assets": 11, "npl_ratio": 3, "cca": 15}
+                       "year": 2024, "total_assets": 11, "npl_ratio": 3, "cca": 15}
 
 
 def test_rankings_respects_year_and_limit(client):

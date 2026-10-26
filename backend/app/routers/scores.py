@@ -121,7 +121,7 @@ def rankings(
                        "composite": result["composite"], "rating": result["rating"],
                        "dimensions_scored": result["dimensions_scored"],
                        # Headline figures for the app's cards, straight from SASRA's tables.
-                       "total_assets": metric.total_assets, "npl_ratio": metric.npl_ratio,
+                       "year": year, "total_assets": metric.total_assets, "npl_ratio": metric.npl_ratio,
                        "cca": metric.cca})
     # Highest composite first; equal scores are listed by name so the order is stable.
     ranked.sort(key=lambda r: (-r["composite"], r["sacco"]["name"]))
