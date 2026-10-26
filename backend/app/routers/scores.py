@@ -91,10 +91,11 @@ def compare(
 @router.get("/rankings")
 def rankings(
     year: Optional[int] = Query(None, description="Data year; defaults to the latest year loaded"),
-    limit: int = Query(10, ge=1, le=50),
+    limit: int = Query(10, ge=1, le=200, description="How many to return; 200 covers every DT-SACCO"),
     db: Session = Depends(get_db),
 ):
-    """Top-scoring SACCOs for one year, best first. SACCOs that cannot be rated are left out."""
+    """Top-scoring SACCOs for one year, best first, with three headline figures each.
+    SACCOs that cannot be rated are left out."""
     if year is None:
         year = db.scalar(select(func.max(FinancialMetric.data_year)))
         if year is None:
@@ -118,7 +119,10 @@ def rankings(
             continue
         ranked.append({"sacco": {"id": sacco.id, "name": sacco.name, "county": sacco.county},
                        "composite": result["composite"], "rating": result["rating"],
-                       "dimensions_scored": result["dimensions_scored"]})
+                       "dimensions_scored": result["dimensions_scored"],
+                       # Headline figures for the app's cards, straight from SASRA's tables.
+                       "total_assets": metric.total_assets, "npl_ratio": metric.npl_ratio,
+                       "cca": metric.cca})
     # Highest composite first; equal scores are listed by name so the order is stable.
     ranked.sort(key=lambda r: (-r["composite"], r["sacco"]["name"]))
     return ranked[:limit]

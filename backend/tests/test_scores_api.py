@@ -128,7 +128,8 @@ def test_rankings_lists_best_first_for_the_latest_year(client):
     body = r.json()
     assert [x["sacco"]["id"] for x in body] == [alpha, beta]
     assert body[0] == {"sacco": {"id": alpha, "name": "ALPHA", "county": "Nairobi"},
-                       "composite": 100.0, "rating": "Green", "dimensions_scored": 4}
+                       "composite": 100.0, "rating": "Green", "dimensions_scored": 4,
+                       "total_assets": 11, "npl_ratio": 3, "cca": 15}
 
 
 def test_rankings_respects_year_and_limit(client):
@@ -137,6 +138,8 @@ def test_rankings_respects_year_and_limit(client):
     assert len(body) == 2
     assert {x["sacco"]["id"] for x in body} == {alpha, gamma}     # the two healthy SACCOs
     assert client.get("/rankings", params={"limit": 0}).status_code == 422
+    assert client.get("/rankings", params={"limit": 200}).status_code == 200    # whole directory
+    assert client.get("/rankings", params={"limit": 201}).status_code == 422
     assert client.get("/rankings", params={"year": 2019}).status_code == 404
 
 
