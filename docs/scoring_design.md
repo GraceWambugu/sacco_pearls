@@ -105,3 +105,47 @@ Boundary values for each indicator (exactly 10%, 12.5%, 5%, 25%), the overrides,
 - `backend/app/routers/scores.py`: `GET /saccos/{id}/score` and `GET /compare`.
 - `backend/tests/test_scoring.py` (18 unit tests) and `backend/tests/test_scores_api.py` (8 API tests).
 - Check on real data: with the NPL override switched off, the engine reproduced the earlier prototype's rating and composite for all 531 loaded rows (0 differences).
+
+## 13. Update (26 October 2026): older reports, liquidity and a minimum-evidence rule
+
+**Data added.** The 2020, 2021 and 2022 reports are now loaded with `scripts/load_older_reports.py`,
+which inserts only missing SACCO-years and fills only empty fields, so the validated 2022-2024
+figures were not overwritten. Every figure printed in two reports was compared: 2,239 matches, 0
+mismatches (`docs/validation_older_reports.csv`). Coverage is now:
+
+| Data year | Rows | Ratios (E, A) | Liquidity | Rating |
+|---|---|---|---|---|
+| 2020 | 175 | no (2020 and 2021 reports have no stability appendix) | no | not rated |
+| 2021 | 177 | yes (from the 2022 report) | yes | rated |
+| 2022 | 179 | yes | yes | rated |
+| 2023 | 180 | yes | no | rated |
+| 2024 | 177 | yes | no | rated |
+
+**Liquidity: shown, not scored (Option A, chosen by the student).** The 2022 report prints a
+liquidity ratio (SASRA minimum 15%) for data years 2021 and 2022 only. Scoring it for two years and
+not the others would make scores from different years not comparable, so the app shows the figure
+under L with no band and no points. The supervisor may prefer to score it; that is one rule in
+`scoring.py`.
+
+**New rule: at least two scored dimensions for a rating** (`MIN_DIMENSIONS_FOR_RATING = 2`, a design
+choice). 2020 rows have sizes only, which would allow the income proxy (R) alone; one weak proxy is
+not enough evidence to call a SACCO Green or Red, so these rows are "Not rated". The rule changed
+none of the 531 previously loaded scores (checked by re-scoring every row before and after).
+
+**Effect of the fuller 2022 peer group.** The 2022 report lists five SACCOs that the 2023 report's
+2022 column omitted (they left before 2023). With them included, the 2022 median income/assets
+moved slightly and two SACCOs near the line moved up one band on R: UNISON 87.5 → 93.8 and
+WANANDEGE 93.8 → 100.0. Both were already Green; no rating colour changed.
+
+**Updated trial counts**
+
+| Year | Green | Amber | Red | Not rated |
+|---|---|---|---|---|
+| 2021 | 83 | 57 | 36 | 1 |
+| 2022 | 93 | 59 | 27 | 0 |
+| 2023 | 82 | 68 | 30 | 0 |
+| 2024 | 82 | 69 | 26 | 0 |
+
+**Still open.** Growth (S) for 2021 and 2022 needs annual average inflation for those years. Add the
+official KNBS figures to `INFLATION` in `scoring.py` (with the source) to score S for those years; until
+then S is reported as "No inflation figure configured for this year".
