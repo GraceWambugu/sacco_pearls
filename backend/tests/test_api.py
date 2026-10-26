@@ -514,3 +514,30 @@ def test_county_import_only_fills_unique_empty_headquarters(client):
         assert db.scalar(select(Sacco).where(Sacco.name == "STIMA DT.")).county == "Nairobi"
         assert db.scalar(select(Sacco).where(Sacco.name == "AFYA")).county == "Nairobi"
         assert db.scalar(select(Sacco).where(Sacco.name == "ARDHI")).county is None
+
+
+def test_stability_rows_read_the_2022_layout_with_liquidity():
+    """The 2022 report adds a liquidity column between external borrowing and NPL."""
+    import pandas as pd
+    from app.etl import stability_rows
+
+    header = ["#", "Name", "2021", "2022", "2021", "2022", "2021", "2022", "2021", "2022",
+              "2021", "2022", "2021", "2022"]
+    stima = ["2", "STIMA DT.", "16.46%", "16.43%", "22.35%", "22.41%", "11.33%", "10.88%",
+             "0.14%", "0.53%", "58.27%", "72.39%", "3.29%", "4.15%"]
+    rows = stability_rows(pd.DataFrame([header, stima]), 2021, 2022)
+
+    assert len(rows) == 2                     # one row per year; the header is skipped
+    y2021, y2022 = rows
+    assert (y2021["data_year"], y2021["cca"], y2021["liquidity_ratio"], y2021["npl_ratio"]) == (2021, 16.46, 58.27, 3.29)
+    assert (y2022["data_year"], y2022["ext_borrowing"], y2022["liquidity_ratio"], y2022["npl_ratio"]) == (2022, 0.53, 72.39, 4.15)
+
+
+def test_stability_rows_read_the_12_column_layout_without_liquidity():
+    import pandas as pd
+    from app.etl import stability_rows
+
+    row = ["1", "STIMA DT.", "16.4%", "19.22%", "22.3%", "27.38%", "11.0%", "12.55%",
+           "0.5%", "1.14%", "4.2%", "6.53%"]
+    y2023, y2024 = stability_rows(pd.DataFrame([row]), 2023, 2024)
+    assert y2024["npl_ratio"] == 6.53 and "liquidity_ratio" not in y2024
