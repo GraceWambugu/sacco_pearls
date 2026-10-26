@@ -36,6 +36,12 @@ WEIGHTS = {"E": 0.40, "A": 0.30, "S": 0.20, "R": 0.10}
 POINTS = {"Green": 100, "Amber": 50, "Red": 0}
 GREEN_FROM = 75.0
 AMBER_FROM = 50.0
+# Design choice: a rating needs at least this many scored dimensions. Older reports
+# (e.g. 2020) publish only sizes, which allow the income proxy (R) alone; one weak
+# proxy is not enough evidence to call a SACCO Green or Red.
+MIN_DIMENSIONS_FOR_RATING = 2
+
+SASRA_LIQUIDITY_MIN = 15.0  # minimum %, printed in the 2022 report; shown, not scored
 
 DIMENSIONS = [  # fixed display order
     ("P", "Protection"),
@@ -49,6 +55,11 @@ NEVER_SCORED = {
     "P": "Loan-loss provisions are not published per SACCO in the SASRA reports",
     "L": "A per-SACCO liquidity ratio is not published in the 2023 and 2024 SASRA reports",
 }
+# Liquidity is shown where SASRA published it, but never scored, so every year is
+# scored the same way and stays comparable (decision recorded in docs/scoring_design.md).
+LIQUIDITY_SHOWN_REASON = ("Shown, not scored: SASRA published a per-SACCO liquidity ratio only in its "
+                          "2022 report (for 2021 and 2022). Scoring it for those years alone would make "
+                          "scores from different years not comparable")
 # ====================================================================
 
 
@@ -222,9 +233,9 @@ def score_sacco(metric, prior, peer_median, inflation):
         "S": _dimension("S", dict(DIMENSIONS)["S"], s_inds),
     }
     scored = {k: d["_raw"] for k, d in dims.items() if d["scored"]}
-    if not scored:
+    if len(scored) < MIN_DIMENSIONS_FOR_RATING:
         return {"year": getattr(m, "data_year", None), "composite": None, "rating": None,
-                "dimensions": _public_dimensions(dims, prior, inflation), "dimensions_scored": 0,
+                "dimensions": _public_dimensions(dims, prior, inflation, m), "dimensions_scored": len(scored),
                 "dimensions_total": len(DIMENSIONS), "weights_used": {}, "overrides": [], "flags": ["limited"]}
 
     # Missing dimensions are excluded, then the remaining weights are scaled to 100%.
@@ -260,7 +271,7 @@ def score_sacco(metric, prior, peer_median, inflation):
         "year": getattr(m, "data_year", None),
         "composite": composite,
         "rating": rating,
-        "dimensions": _public_dimensions(dims, prior, inflation),
+        "dimensions": _public_dimensions(dims, prior, inflation, m),
         "dimensions_scored": len(scored),
         "dimensions_total": len(DIMENSIONS),
         "weights_used": weights_used,
@@ -269,10 +280,18 @@ def score_sacco(metric, prior, peer_median, inflation):
     }
 
 
-def _public_dimensions(dims, prior, inflation):
+def _public_dimensions(dims, prior, inflation, metric=None):
     """All six PEARLS dimensions in order, with a reason for every one that is not scored."""
     out = {}
     for code, name in DIMENSIONS:
+        liquidity = _num(getattr(metric, "liquidity_ratio", None))
+        if code == "L" and liquidity is not None:
+            # Displayed for information; band is None so it never adds points.
+            out[code] = {"code": code, "name": name, "scored": False, "score": None,
+                         "reason": LIQUIDITY_SHOWN_REASON,
+                         "indicators": [_indicator("liquidity_ratio", "Liquidity ratio", liquidity, None,
+                                                   f"SASRA minimum {SASRA_LIQUIDITY_MIN:g}% (shown for information, not scored)")]}
+            continue
         if code in NEVER_SCORED:
             out[code] = {"code": code, "name": name, "scored": False, "score": None,
                          "reason": NEVER_SCORED[code], "indicators": []}

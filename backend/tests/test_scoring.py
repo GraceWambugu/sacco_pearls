@@ -173,3 +173,22 @@ def test_mwalimu_2024_is_amber_because_ica_is_just_under_ten():
     ica = [i for i in r["dimensions"]["E"]["indicators"] if i["key"] == "ica"][0]
     assert ica["band"] == "Amber"                              # 9.96% is just under the 10% Green line
     assert r["composite"] == 71.7 and r["rating"] == "Amber"
+
+
+def test_a_single_dimension_is_not_enough_for_a_rating():
+    # A 2020 row: sizes only, so just the income proxy (R) can be scored.
+    sizes_only = metric(cca=None, ccd=None, ica=None, ext_borrowing=None, npl_ratio=None)
+    r = score(sizes_only, prior=None)
+    assert r["dimensions_scored"] == 1
+    assert r["composite"] is None and r["rating"] is None
+    assert "limited" in r["flags"]
+
+
+def test_liquidity_is_shown_but_never_scored():
+    r = score(metric(liquidity_ratio=72.39))
+    liquidity = r["dimensions"]["L"]
+    assert liquidity["scored"] is False and liquidity["score"] is None
+    assert liquidity["indicators"][0]["value"] == 72.39
+    assert liquidity["indicators"][0]["band"] is None      # no band, so no points
+    assert "Shown, not scored" in liquidity["reason"]
+    assert r["composite"] == score()["composite"]          # the composite is unchanged
