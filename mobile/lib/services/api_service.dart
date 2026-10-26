@@ -103,6 +103,17 @@ class ApiService {
     return SaccoScore.fromJson(json);
   }
 
+  /// Rated SACCOs for the latest year, best first. limit 200 covers the whole directory.
+  static Future<List<RankedSacco>> getRankings({int limit = 200}) async {
+    final json = await ApiClient.get('/rankings', query: {'limit': limit});
+    if (json is! List) {
+      throw const FormatException('Unexpected rankings response');
+    }
+    return json
+        .map((item) => RankedSacco.fromJson(Map<String, dynamic>.from(item as Map)))
+        .toList(growable: false);
+  }
+
   /// Every year that has figures, oldest first.
   static Future<List<TrendPoint>> getTrend(int saccoId) async {
     final json = await ApiClient.get('/saccos/$saccoId/trend');

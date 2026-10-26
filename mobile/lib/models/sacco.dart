@@ -213,3 +213,39 @@ class TrendPoint {
 
 List<String> _strings(dynamic value) =>
     (value as List<dynamic>? ?? const []).map((item) => item.toString()).toList(growable: false);
+
+/// One item of GET /rankings: a rated SACCO with three headline figures.
+class RankedSacco {
+  const RankedSacco({
+    required this.sacco,
+    required this.composite,
+    required this.rating,
+    required this.year,
+    this.dimensionsScored = 0,
+    this.totalAssets,
+    this.nplRatio,
+    this.cca,
+  });
+
+  final SaccoRecord sacco;
+  final num composite;
+  final String rating;
+  final int year;
+  final int dimensionsScored;
+  final num? totalAssets; // KES billions
+  final num? nplRatio; // percent
+  final num? cca; // core capital / total assets, percent
+
+  factory RankedSacco.fromJson(Map<String, dynamic> json) {
+    return RankedSacco(
+      sacco: SaccoRecord.fromJson(Map<String, dynamic>.from(json['sacco'] as Map)),
+      composite: json['composite'] as num,
+      rating: json['rating'] as String,
+      year: json['year'] as int,
+      dimensionsScored: json['dimensions_scored'] as int? ?? 0,
+      totalAssets: json['total_assets'] as num?,
+      nplRatio: json['npl_ratio'] as num?,
+      cca: json['cca'] as num?,
+    );
+  }
+}

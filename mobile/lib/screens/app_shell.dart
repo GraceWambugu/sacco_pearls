@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../models/directory_request.dart';
 import '../models/sacco.dart';
 import '../providers/auth_provider.dart';
 import '../providers/compare_provider.dart';
 import '../services/api_service.dart';
+import 'account_screen.dart';
 import 'auth_screen.dart';
 import 'compare_screen.dart';
 import 'member_home_screen.dart';
@@ -28,9 +30,23 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> {
   int _selectedIndex = AppShell.homeTab;
-  late final Future<List<SaccoRecord>> _directory = ApiService.searchSaccos('');
+  // Scores for every SACCO, loaded once and shared by Home and the Directory.
+  late final Future<List<RankedSacco>> _rankings = ApiService.getRankings();
+  // Home writes here to send the member to the Directory with a search or filter.
+  final _directoryRequest = ValueNotifier<DirectoryRequest?>(null);
+
+  @override
+  void dispose() {
+    _directoryRequest.dispose();
+    super.dispose();
+  }
 
   void _goTo(int index) => setState(() => _selectedIndex = index);
+
+  void _openDirectory(DirectoryRequest request) {
+    _directoryRequest.value = request;
+    _goTo(AppShell.searchTab);
+  }
 
   /// Saved is a page opened from Home, not a tab. "Find a SACCO" on it closes
   /// the page and switches to the Directory tab.
@@ -50,12 +66,13 @@ class _AppShellState extends State<AppShell> {
     final pages = [
       MemberHomeScreen(
         account: account,
+        rankings: _rankings,
         onNavigate: _goTo,
+        onOpenDirectory: _openDirectory,
         onOpenAccount: () => openAccount(context),
         onOpenSaved: _openSaved,
-        directory: _directory,
       ),
-      const SaccoSearchScreen(),
+      SaccoSearchScreen(rankingsLoader: () => _rankings, request: _directoryRequest),
       CompareScreen(onBrowse: () => _goTo(AppShell.searchTab)),
       const TrendsScreen(),
     ];
