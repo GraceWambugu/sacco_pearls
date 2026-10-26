@@ -434,7 +434,7 @@ class _RatiosCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final indicators = [
-      for (final code in const ['E', 'A', 'R', 'S']) ...?score.dimensions[code]?.indicators,
+      for (final code in const ['E', 'A', 'R', 'L', 'S']) ...?score.dimensions[code]?.indicators,
     ];
     return Panel(
       radius: 24,
@@ -472,7 +472,7 @@ class _RatiosCard extends StatelessWidget {
                   SizedBox(
                     width: 46,
                     child: Text(
-                      indicator.band ?? '—',
+                      indicator.band ?? 'Info',
                       textAlign: TextAlign.right,
                       style: const TextStyle(color: AppColors.muted, fontSize: 11),
                     ),
@@ -533,6 +533,10 @@ class _DimensionRow extends StatelessWidget {
     final score = dimension.score;
     final scored = dimension.scored && score != null;
     final band = scored ? bandForScore(score) : null;
+    // Liquidity in 2021-2022: a published figure that is shown but not scored.
+    final shownValue = scored
+        ? null
+        : dimension.indicators.where((i) => i.value != null).map((i) => i.value!).firstOrNull;
 
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 5),
@@ -585,9 +589,9 @@ class _DimensionRow extends StatelessWidget {
                     Text('${formatNumber(score)} · $band', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
                   ],
                 )
-              : const Text(
-                  'Not available',
-                  style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 13),
+              : Text(
+                  shownValue == null ? 'Not available' : 'Shown, not scored · ${formatNumber(shownValue)}%',
+                  style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 13),
                 ),
         ),
         children: [
@@ -630,8 +634,8 @@ class _IndicatorRow extends StatelessWidget {
                 value == null ? 'Missing' : '${formatNumber(value)}${indicator.unit ?? ''}',
                 style: const TextStyle(fontWeight: FontWeight.w800),
               ),
-              const SizedBox(width: 8),
-              RatingChip(rating: indicator.band),
+              // No band means the figure is shown for information only (liquidity).
+              if (indicator.band != null) ...[const SizedBox(width: 8), RatingChip(rating: indicator.band)],
             ],
           ),
           if (indicator.rule != null) ...[

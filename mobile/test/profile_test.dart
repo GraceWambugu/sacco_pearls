@@ -167,4 +167,21 @@ void main() {
       expect(find.textContaining('total assets below gross loans'), findsOneWidget);
     });
   });
+
+  testWidgets('a published liquidity ratio is shown but not scored', (tester) async {
+    final json = stimaJson();
+    (json['dimensions'] as Map)['L'] = {
+      'code': 'L', 'name': 'Liquidity', 'scored': false, 'score': null,
+      'reason': 'Shown, not scored: SASRA published a per-SACCO liquidity ratio only in its 2022 report',
+      'indicators': [
+        {'key': 'liquidity_ratio', 'label': 'Liquidity ratio', 'value': 72.39, 'unit': '%', 'band': null,
+         'points': null, 'rule': 'SASRA minimum 15% (shown for information, not scored)'},
+      ],
+    };
+    await pumpProfile(tester, json: json);
+
+    expect(find.text('Shown, not scored · 72.4%'), findsOneWidget);
+    expect(find.text('Not available'), findsOneWidget); // only Protection now
+    expect(find.text('Info'), findsOneWidget); // ratios card: no band for liquidity
+  });
 }
