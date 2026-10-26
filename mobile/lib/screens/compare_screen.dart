@@ -160,7 +160,7 @@ class _PickedSaccos extends StatelessWidget {
                 backgroundColor: AppColors.compareSeries[index],
                 child: Text(
                   '${index + 1}',
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13),
+                  style: const TextStyle(color: AppColors.paper, fontWeight: FontWeight.w800, fontSize: 13),
                 ),
               ),
               title: Text(sacco.name, style: const TextStyle(fontWeight: FontWeight.w700)),

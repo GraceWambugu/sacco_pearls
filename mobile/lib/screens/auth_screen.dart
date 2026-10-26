@@ -151,7 +151,7 @@ class _AuthScreenState extends State<AuthScreen> {
                           color: AppColors.forest,
                           borderRadius: BorderRadius.circular(7),
                         ),
-                        child: const Icon(Icons.eco_rounded, color: AppColors.accent, size: 20),
+                        child: const Icon(Icons.eco_rounded, color: AppColors.highlight, size: 20),
                       ),
                       const SizedBox(width: 10),
                       const Text(
@@ -303,8 +303,8 @@ class _AuthScreenState extends State<AuthScreen> {
                             child: FilledButton(
                               onPressed: _isLoading ? null : _submit,
                               style: FilledButton.styleFrom(
-                                backgroundColor: AppColors.accent,
-                                foregroundColor: AppColors.forestDark,
+                                backgroundColor: AppColors.forest,
+                                foregroundColor: Colors.white,
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(7),
                                 ),
@@ -314,7 +314,7 @@ class _AuthScreenState extends State<AuthScreen> {
                                       dimension: 20,
                                       child: CircularProgressIndicator(
                                         strokeWidth: 2,
-                                        color: AppColors.forestDark,
+                                        color: Colors.white,
                                       ),
                                     )
                                   : Text(

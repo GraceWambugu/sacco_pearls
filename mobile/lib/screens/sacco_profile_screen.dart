@@ -292,7 +292,7 @@ class _ScoreCard extends StatelessWidget {
               value: ((composite ?? 0) / 100).clamp(0.0, 1.0).toDouble(),
               minHeight: 8,
               backgroundColor: Colors.white24,
-              color: AppColors.accent,
+              color: AppColors.highlight,
             ),
           ),
           const SizedBox(height: 12),

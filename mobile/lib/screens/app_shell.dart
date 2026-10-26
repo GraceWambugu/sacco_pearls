@@ -9,17 +9,18 @@ import 'auth_screen.dart';
 import 'compare_screen.dart';
 import 'member_home_screen.dart';
 import 'sacco_search_screen.dart';
+import 'trends_screen.dart';
 import 'watchlist_screen.dart';
 
-/// The four main tabs: Home, Search, Compare and Saved.
-/// Account is reached from the person icon on Home, not a tab.
+/// The four main tabs: Home, Directory, Compare and Trends.
+/// Saved SACCOs and Account open from Home.
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
 
   static const homeTab = 0;
   static const searchTab = 1;
   static const compareTab = 2;
-  static const savedTab = 3;
+  static const trendsTab = 3;
 
   @override
   State<AppShell> createState() => _AppShellState();
@@ -31,6 +32,17 @@ class _AppShellState extends State<AppShell> {
 
   void _goTo(int index) => setState(() => _selectedIndex = index);
 
+  /// Saved is a page opened from Home, not a tab. "Find a SACCO" on it closes
+  /// the page and switches to the Directory tab.
+  void _openSaved() {
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (pageContext) => WatchlistScreen(onBrowse: () {
+        Navigator.of(pageContext).pop();
+        _goTo(AppShell.searchTab);
+      }),
+    ));
+  }
+
   @override
   Widget build(BuildContext context) {
     final account = context.watch<AuthProvider>().account;
@@ -40,11 +52,12 @@ class _AppShellState extends State<AppShell> {
         account: account,
         onNavigate: _goTo,
         onOpenAccount: () => openAccount(context),
+        onOpenSaved: _openSaved,
         directory: _directory,
       ),
       const SaccoSearchScreen(),
       CompareScreen(onBrowse: () => _goTo(AppShell.searchTab)),
-      WatchlistScreen(onBrowse: () => _goTo(AppShell.searchTab)),
+      const TrendsScreen(),
     ];
 
     return Scaffold(
@@ -59,7 +72,7 @@ class _AppShellState extends State<AppShell> {
             selectedIcon: Icon(Icons.home_rounded),
             label: 'Home',
           ),
-          const NavigationDestination(icon: Icon(Icons.search_rounded), label: 'Search'),
+          const NavigationDestination(icon: Icon(Icons.search_rounded), label: 'Directory'),
           NavigationDestination(
             // The badge shows how many SACCOs are waiting to be compared.
             icon: Badge(
@@ -70,9 +83,8 @@ class _AppShellState extends State<AppShell> {
             label: 'Compare',
           ),
           const NavigationDestination(
-            icon: Icon(Icons.bookmark_border_rounded),
-            selectedIcon: Icon(Icons.bookmark_rounded),
-            label: 'Saved',
+            icon: Icon(Icons.show_chart_rounded),
+            label: 'Trends',
           ),
         ],
       ),

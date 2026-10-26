@@ -5,10 +5,9 @@ import '../models/sacco.dart';
 import 'sacco_profile_screen.dart';
 import '../theme/app_colors.dart';
 
-// Tab numbers, matching AppShell (Home 0, Search 1, Compare 2, Saved 3).
+// Tab numbers, matching AppShell (Home 0, Directory 1, Compare 2, Trends 3).
 const _searchTab = 1;
 const _compareTab = 2;
-const _savedTab = 3;
 
 class MemberHomeScreen extends StatelessWidget {
   const MemberHomeScreen({
@@ -17,6 +16,7 @@ class MemberHomeScreen extends StatelessWidget {
     required this.onNavigate,
     required this.directory,
     this.onOpenAccount,
+    this.onOpenSaved,
   });
 
   /// Null when nobody is signed in; the app still works, saving just needs sign-in.
@@ -24,6 +24,7 @@ class MemberHomeScreen extends StatelessWidget {
   final ValueChanged<int> onNavigate;
   final Future<List<SaccoRecord>> directory;
   final VoidCallback? onOpenAccount;
+  final VoidCallback? onOpenSaved;
 
   @override
   Widget build(BuildContext context) {
@@ -40,7 +41,7 @@ class MemberHomeScreen extends StatelessWidget {
             onPressed: () => showRatingGuide(context),
             style: IconButton.styleFrom(
               backgroundColor: AppColors.accentSoft,
-              foregroundColor: AppColors.forestDark,
+              foregroundColor: AppColors.highlight,
             ),
             icon: const Icon(Icons.info_outline_rounded),
           ),
@@ -103,7 +104,7 @@ class MemberHomeScreen extends StatelessWidget {
                 title: 'Compare',
                 detail: 'Choose up to three',
                 background: AppColors.accent,
-                foreground: AppColors.forestDark,
+                foreground: AppColors.ink,
                 iconBackground: AppColors.surface,
                 onTap: () => onNavigate(_compareTab),
               ),
@@ -114,7 +115,7 @@ class MemberHomeScreen extends StatelessWidget {
                 background: AppColors.surface,
                 foreground: AppColors.ink,
                 iconBackground: AppColors.accentSoft,
-                onTap: () => onNavigate(_savedTab),
+                onTap: onOpenSaved ?? () {},
               ),
               _HomeActionTile(
                 icon: Icons.person_outline_rounded,
@@ -203,7 +204,7 @@ class _DirectorySummary extends StatelessWidget {
             ),
             child: Row(
               children: [
-                const Icon(Icons.account_balance_rounded, color: AppColors.accent, size: 30),
+                const Icon(Icons.account_balance_rounded, color: AppColors.highlight, size: 30),
                 const SizedBox(width: 15),
                 Expanded(
                   child: Column(
@@ -225,7 +226,7 @@ class _DirectorySummary extends StatelessWidget {
                     ],
                   ),
                 ),
-                const Icon(Icons.arrow_forward_rounded, color: AppColors.accent),
+                const Icon(Icons.arrow_forward_rounded, color: AppColors.highlight),
               ],
             ),
           ),
@@ -273,7 +274,7 @@ class _HomeActionTile extends StatelessWidget {
                   color: iconBackground,
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(icon, color: AppColors.forestDark, size: 19),
+                child: Icon(icon, color: AppColors.highlight, size: 19),
               ),
               const SizedBox(width: 9),
               Expanded(
