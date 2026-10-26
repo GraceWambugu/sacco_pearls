@@ -1,11 +1,15 @@
-# SACCO PEARLS App (prototype)
-Mobile SACCO membership decision system using PEARLS-based benchmarking.
+# SACCOLens: SACCO PEARLS App (prototype)
+Mobile decision-support system that benchmarks Kenyan deposit-taking SACCOs with a
+rules-based, PEARLS-aligned score built from SASRA's Annual Supervision Reports (2020-2024).
+Not machine learning, not financial advice.
 
 ## Layout
-- `etl/`      PDF extraction (Camelot) -> cleaned CSV
-- `backend/`  FastAPI + SQLAlchemy + PostgreSQL (Argon2id hashing, JWT, CRUD)
+- `etl/`      command-line PDF extraction (Camelot) -> cleaned CSV
+- `backend/`  FastAPI + SQLAlchemy + PostgreSQL (Argon2id, JWT, scoring, ETL, load test)
+- `mobile/`   Flutter app (Home, Directory, Compare, Trends, Profile, Saved)
+- `admin/`    admin web pages (login, PDF upload, data management)
 - `data/raw/` SASRA PDFs (renamed by REPORT year)
-- `docs/`     SRS, diagrams, wireframes, validation logs
+- `docs/`     scoring design, validation logs, Chapter 4 drafts (`docs/chapter4/`)
 
 ## Run (from repo root, venv active)
     pip install -r requirements.txt
@@ -58,3 +62,26 @@ From `backend`, preview unique matches against existing SACCOs before applying:
 
 Only blank counties with a unique name match are filled. Missing PDF rows and
 unmatched names are reported for manual review; existing counties are preserved.
+
+## Older reports (2020-2022)
+From `backend`. Dry run first; it prints counts, new SACCO names and any mismatches without saving:
+
+    ..\.venv\Scripts\python.exe -m scripts.load_older_reports
+    ..\.venv\Scripts\python.exe -m scripts.load_older_reports --apply
+
+It inserts only missing SACCO-years, fills only empty fields (e.g. liquidity) and never overwrites a
+validated figure. Spelling variants are mapped in `SAME_SACCO` inside the script.
+
+## Mobile app
+Start the API with `--host 0.0.0.0` (see above), start an emulator, then from `mobile`:
+
+    flutter run
+    flutter run --dart-define=API_BASE=http://192.168.1.20:8000   # a real phone on the same Wi-Fi
+    flutter test
+
+Plain `http://` works in debug builds only; a release build needs an `https://` API.
+
+## Tests and load test
+    cd backend; ..\.venv\Scripts\python.exe -m pytest -q        # 72 tests
+    cd mobile;  flutter test                                         # 43 tests
+    cd backend; ..\.venv\Scripts\python.exe -m locust -f loadtest/locustfile.py --host http://127.0.0.1:8000 --headless -u 50 -r 10 -t 2m --csv ../docs/chapter4/loadtest/results
