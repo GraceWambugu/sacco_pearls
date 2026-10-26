@@ -114,12 +114,13 @@ class ApiService {
         .toList(growable: false);
   }
 
-  static Future<Map<String, dynamic>> compareSaccos(List<int> saccoIds) async {
+  /// 2 or 3 SACCOs scored on the latest year they all have.
+  static Future<CompareResult> compareSaccos(List<int> saccoIds) async {
     final json = await ApiClient.get('/compare', query: {'ids': saccoIds.join(',')});
     if (json is! Map<String, dynamic>) {
       throw const FormatException('Unexpected comparison response');
     }
-    return json;
+    return CompareResult.fromJson(json);
   }
 
   // ---- Saved SACCOs (needs sign-in) ----

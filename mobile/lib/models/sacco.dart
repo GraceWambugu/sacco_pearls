@@ -25,8 +25,11 @@ class SaccoScore {
     this.dimensionsTotal = 6,
     this.overrides = const [],
     this.flags = const [],
+    this.sacco,
   });
 
+  /// Which SACCO this score belongs to (sent by the API, used on Compare).
+  final SaccoRecord? sacco;
   final int year;
 
   /// 0-100, or null when nothing could be scored.
@@ -62,7 +65,42 @@ class SaccoScore {
       dimensionsTotal: json['dimensions_total'] as int? ?? 6,
       overrides: _strings(json['overrides']),
       flags: _strings(json['flags']),
+      sacco: json['sacco'] == null
+          ? null
+          : SaccoRecord.fromJson(Map<String, dynamic>.from(json['sacco'] as Map)),
     );
+  }
+}
+
+/// GET /compare: two or three scores for the same year, plus the API's best-first order.
+class CompareResult {
+  const CompareResult({required this.year, required this.results, required this.ranking});
+
+  final int year;
+  final List<SaccoScore> results; // in the order the SACCOs were picked
+  final List<int> ranking; // SACCO ids, best composite first
+
+  factory CompareResult.fromJson(Map<String, dynamic> json) {
+    return CompareResult(
+      year: json['year'] as int,
+      results: (json['results'] as List<dynamic>? ?? const [])
+          .map((item) => SaccoScore.fromJson(Map<String, dynamic>.from(item as Map)))
+          .toList(growable: false),
+      ranking: (json['ranking'] as List<dynamic>? ?? const []).cast<int>(),
+    );
+  }
+
+  /// Rank of one result: 1 + how many others scored strictly higher, so equal
+  /// composites share a rank ("Joint 1st"). Null when the SACCO is unrated.
+  int? rankOf(SaccoScore score) {
+    final mine = score.composite;
+    if (mine == null) return null;
+    return 1 + results.where((other) => (other.composite ?? -1) > mine).length;
+  }
+
+  bool isTied(SaccoScore score) {
+    final mine = score.composite;
+    return mine != null && results.where((other) => other.composite == mine).length > 1;
   }
 }
 
