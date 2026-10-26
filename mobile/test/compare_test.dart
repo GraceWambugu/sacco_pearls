@@ -127,16 +127,18 @@ void main() {
       });
 
       expect(requested, [7, 4]);
-      expect(find.text('2nd of 2'), findsOneWidget); // MWALIMU
+      expect(find.text('2nd of 2'), findsOneWidget); // MWALIMU, in the table's Rank row
       expect(find.text('1st of 2'), findsOneWidget); // STIMA
+      expect(find.text('85/100'), findsOneWidget);
+      expect(find.text('71.7/100'), findsOneWidget);
       // The rating word sits in each SACCO's chip, not only its colour.
       Finder chipWord(String word) => find.descendant(of: find.byType(RatingChip), matching: find.text(word));
       expect(chipWord('Green'), findsOneWidget);
       expect(chipWord('Amber'), findsOneWidget);
       expect(find.byType(RadarChart), findsOneWidget);
       expect(find.textContaining('Protection (P) and Liquidity (L) are not on the chart'), findsOneWidget);
-      expect(find.text('P · Protection'), findsOneWidget);
-      expect(find.text('Not available for any SACCO'), findsNWidgets(2)); // P and L rows
+      expect(find.text('P · Protection\nL · Liquidity'), findsOneWidget);
+      expect(find.text('Not available'), findsNWidgets(2)); // one cell per SACCO
     });
 
     testWidgets('ties are shown as joint', (tester) async {
@@ -176,7 +178,7 @@ void main() {
             scoreJson(afya, 80.0, 'Green'),
           ]));
 
-      await tester.tap(find.text('Add another SACCO'));
+      await tester.tap(find.text('Add SACCO'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('AFYA').last);
       await tester.pumpAndSettle();

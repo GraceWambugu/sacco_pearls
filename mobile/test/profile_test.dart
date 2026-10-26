@@ -118,8 +118,9 @@ void main() {
     testWidgets('shows the composite, the rating word and all six PEARLS rows', (tester) async {
       await pumpProfile(tester);
 
-      expect(find.text('85.0'), findsOneWidget);
-      expect(find.text('Green'), findsOneWidget); // the word, not only the colour
+      expect(find.textContaining('85.0 /100', findRichText: true), findsOneWidget); // big number
+      expect(find.text('Green rating'), findsOneWidget); // the word, not only the colour
+      expect(find.textContaining('STIMA DT. is rated Green (85.0 out of 100) on 2024 figures'), findsOneWidget);
       expect(find.text('4 OF 6 SCORED'), findsOneWidget);
       for (final name in ['Protection', 'Effective financial structure', 'Asset quality',
           'Rates of return and costs', 'Liquidity', 'Signs of growth']) {
@@ -139,7 +140,7 @@ void main() {
 
       await tester.tap(find.text('Effective financial structure'));
       await tester.pumpAndSettle();
-      expect(find.text('19.2%'), findsOneWidget);
+      expect(find.text('19.2%'), findsNWidgets(2)); // in the ratios card and the expanded row
       expect(find.textContaining('How it is rated: SASRA minimum 10%'), findsOneWidget);
     });
 
@@ -150,7 +151,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(requested, [null, 2023]); // latest first, then the chosen year
-      expect(find.text('HEALTH SCORE · 2023'), findsOneWidget);
+      expect(find.text('PEARLS composite · 2023'), findsOneWidget);
     });
 
     testWidgets('overrides and data flags are explained in words', (tester) async {

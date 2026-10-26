@@ -140,6 +140,7 @@ class PearlsDimension {
 
 class PearlsIndicator {
   const PearlsIndicator({
+    this.key = '',
     required this.label,
     required this.value,
     required this.unit,
@@ -147,6 +148,8 @@ class PearlsIndicator {
     this.rule,
   });
 
+  /// Short id from the API, e.g. "npl_ratio" or "cca".
+  final String key;
   final String label;
   final num? value;
   final String? unit;
@@ -159,6 +162,7 @@ class PearlsIndicator {
 
   factory PearlsIndicator.fromJson(Map<String, dynamic> json) {
     return PearlsIndicator(
+      key: json['key'] as String? ?? '',
       label: json['label'] as String,
       value: json['value'] as num?,
       unit: json['unit'] as String?,
