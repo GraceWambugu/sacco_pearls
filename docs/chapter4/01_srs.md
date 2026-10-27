@@ -52,7 +52,7 @@ The system extracts per-SACCO figures from SASRA PDF reports (2020 to 2024 repor
 
 - SASRA publishes only some PEARLS inputs per SACCO. Protection (loan-loss provisions) is never published; liquidity appears only in the 2022 report (data years 2021 and 2022), so it is shown but not scored.
 - The 2020 and 2021 reports have no stability appendix, so data year 2020 has sizes only and is not rated.
-- Growth (S) needs the previous year and an inflation figure; inflation is configured for 2023 and 2024 only (KNBS annual averages).
+- Growth (S) needs the previous year and an inflation figure; inflation is configured for 2021 to 2024 (KNBS annual averages via the Central Bank of Kenya), so S is scored from 2021 wherever the previous year's sizes exist.
 - Figures can be carried forward or inconsistent in the source tables; these are flagged, not corrected.
 
 ## 6. Changes from the proposal (to explain in the report)

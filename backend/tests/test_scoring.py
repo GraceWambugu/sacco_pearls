@@ -116,6 +116,14 @@ def test_no_inflation_figure_drops_growth():
     assert r["dimensions"]["S"]["scored"] is False and "inflation" in r["dimensions"]["S"]["reason"]
 
 
+def test_inflation_configured_for_every_rated_year():
+    # December annual averages from the CBK inflation table (source: KNBS)
+    assert sc.INFLATION == {2021: 5.62, 2022: 7.66, 2023: 7.67, 2024: 4.50}
+    prior_2021 = metric(data_year=2021, total_assets=9.0, total_deposits=6.3, gross_loans=5.4)
+    r = score(metric(data_year=2022), prior=prior_2021, inflation=sc.INFLATION[2022])
+    assert r["dimensions"]["S"]["scored"] is True and r["dimensions_scored"] == 4
+
+
 def test_negative_core_capital_forces_red():
     r = score(metric(cca=-5.0))
     assert r["rating"] == "Red"

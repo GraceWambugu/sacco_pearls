@@ -27,8 +27,9 @@ NPL_CRITICAL_ABOVE = 25.0   # design choice: above this the rating is forced to 
 
 YIELD_AMBER_FRACTION = 0.75  # design choice: income/assets compared with the peer median
 
-# Annual average CPI inflation, %, KNBS (published by the Central Bank of Kenya)
-INFLATION = {2023: 7.67, 2024: 4.50}
+# Annual average CPI inflation, %, KNBS (published by the Central Bank of Kenya):
+# the December "Annual Average Inflation" figure at centralbank.go.ke/inflation-rates
+INFLATION = {2021: 5.62, 2022: 7.66, 2023: 7.67, 2024: 4.50}
 
 # Dimension weights; available dimensions are re-normalized to total 100% below.
 WEIGHTS = {"E": 0.40, "A": 0.30, "S": 0.20, "R": 0.10}

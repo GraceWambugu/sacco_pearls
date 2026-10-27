@@ -30,7 +30,7 @@ Each indicator is mapped to a band: Green = 100 points, Amber = 50, Red = 0.
 | ICA | below 8% | 8% to under 10% | 10% or more | SASRA minimum 8% (pp.174-175); WOCCU target about 10% |
 | External borrowing / assets | above 25% | above 18.75% to 25% | 18.75% or less | SASRA maximum 25% (pp.174-175) |
 | NPL ratio | above 10% | above 5% to 10% | 5% or less | WOCCU: no more than 5% delinquency. The 10% Red line is a design choice |
-| Growth in assets, deposits, loans | below 0% | 0% to under inflation | at or above inflation (real growth) | WOCCU: real positive growth. Inflation: 7.67% (2023), 4.50% (2024), KNBS annual averages via the Central Bank of Kenya |
+| Growth in assets, deposits, loans | below 0% | 0% to under inflation | at or above inflation (real growth) | WOCCU: real positive growth. Inflation: 5.62% (2021), 7.66% (2022), 7.67% (2023), 4.50% (2024), KNBS annual averages via the Central Bank of Kenya (December "Annual Average Inflation", centralbank.go.ke/inflation-rates) |
 | Income / total assets | below 75% of the peer median | 75% of median up to the median | at or above the median | Peer-relative proxy. Design choice |
 
 Green means at least 25% better than the regulatory limit. This margin is one adjustable parameter.
@@ -146,6 +146,19 @@ WANANDEGE 93.8 → 100.0. Both were already Green; no rating colour changed.
 | 2023 | 82 | 68 | 30 | 0 |
 | 2024 | 82 | 69 | 26 | 0 |
 
-**Still open.** Growth (S) for 2021 and 2022 needs annual average inflation for those years. Add the
-official KNBS figures to `INFLATION` in `scoring.py` (with the source) to score S for those years; until
-then S is reported as "No inflation figure configured for this year".
+**Growth for 2021 and 2022 (added 2026-10-27).** Growth (S) needs the previous year's sizes and that
+year's annual average inflation. The sizes were already loaded (2020 and 2021); the missing inflation
+figures were added to `INFLATION` in `scoring.py`: 5.62% (2021) and 7.66% (2022), the December "Annual
+Average Inflation" values in the Central Bank of Kenya table (source: KNBS). The same table gives
+7.67% (2023) and 4.50% (2024), matching the figures already used, which confirms the column.
+
+Effect: S is now scored for 169 of 177 SACCOs in 2021 (eight have no 2020 sizes) and 176 of 179 in
+2022. The one 2021 SACCO that was "Not rated" now has two scored dimensions and is rated. 2023 and
+2024 are unchanged.
+
+| Year | Green | Amber | Red | Not rated |
+|---|---|---|---|---|
+| 2021 | 83 → 80 | 57 → 62 | 36 → 35 | 1 → 0 |
+| 2022 | 93 → 91 | 59 → 58 | 27 → 30 | 0 |
+| 2023 | 82 | 68 | 30 | 0 |
+| 2024 | 82 | 69 | 26 | 0 |
