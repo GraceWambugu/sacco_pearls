@@ -1,11 +1,15 @@
-# SACCO PEARLS App (prototype)
-Mobile SACCO membership decision system using PEARLS-based benchmarking.
+# SACCOLens: SACCO PEARLS App (prototype)
+Mobile decision-support system that benchmarks Kenyan deposit-taking SACCOs with a
+rules-based, PEARLS-aligned score built from SASRA's Annual Supervision Reports (2020-2024).
+Not machine learning, not financial advice.
 
 ## Layout
-- `etl/`      PDF extraction (Camelot) -> cleaned CSV
-- `backend/`  FastAPI + SQLAlchemy + PostgreSQL (Argon2id hashing, JWT, CRUD)
+- `etl/`      command-line PDF extraction (Camelot) -> cleaned CSV
+- `backend/`  FastAPI + SQLAlchemy + PostgreSQL (Argon2id, JWT, scoring, ETL, load test)
+- `mobile/`   Flutter app (Home, Directory, Compare, Trends, Profile, Saved)
+- `admin/`    admin web pages (login, PDF upload, data management)
 - `data/raw/` SASRA PDFs (renamed by REPORT year)
-- `docs/`     SRS, diagrams, wireframes, validation logs
+- `docs/`     scoring design, validation logs, Chapter 4 drafts (`docs/chapter4/`)
 
 ## Run (from repo root, venv active)
     pip install -r requirements.txt
@@ -26,6 +30,29 @@ hidden prompts. Passwords must contain at least 8 characters, a letter and a dig
 This preserves the account role. The create-admin script does not reset passwords
 for existing accounts. This recovery command is for trusted local operators only.
 
+## Mobile member accounts
+The mobile app supports member registration and sign-in. Passwords are validated
+for at least eight characters with a letter and a digit, then stored by the API
+as Argon2id hashes with per-password random salts. Mobile access tokens are kept
+in Android secure storage.
+
+For Android Emulator development, start the API from `backend` so the emulator
+can reach the host machine:
+
+    ..\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --host 0.0.0.0
+
+The app uses `http://10.0.2.2:8000` for the Android Emulator host bridge. Change
+the API base URL before using a physical phone or deploying the app.
+
+### Mobile forgot password
+Copy the SMTP settings from `backend/.env.example` into the ignored
+`backend/.env` file. Configure the SMTP host, port, sender address, username,
+and an email-provider app password; use SSL on port 465 or STARTTLS on port 587.
+Restart the API after changing `.env`. Until SMTP is configured, the reset
+request endpoint returns `503` and the app shows that email delivery is
+unavailable. When configured, reset emails contain a one-time token that expires
+after 20 minutes. Only a SHA-256 digest of that token is stored by the API.
+
 ## Headquarters counties from the 2024 directory
 Appendix VII of the SASRA 2024 PDF lists DT-SACCO headquarters and counties.
 From `backend`, preview unique matches against existing SACCOs before applying:
@@ -35,3 +62,26 @@ From `backend`, preview unique matches against existing SACCOs before applying:
 
 Only blank counties with a unique name match are filled. Missing PDF rows and
 unmatched names are reported for manual review; existing counties are preserved.
+
+## Older reports (2020-2022)
+From `backend`. Dry run first; it prints counts, new SACCO names and any mismatches without saving:
+
+    ..\.venv\Scripts\python.exe -m scripts.load_older_reports
+    ..\.venv\Scripts\python.exe -m scripts.load_older_reports --apply
+
+It inserts only missing SACCO-years, fills only empty fields (e.g. liquidity) and never overwrites a
+validated figure. Spelling variants are mapped in `SAME_SACCO` inside the script.
+
+## Mobile app
+Start the API with `--host 0.0.0.0` (see above), start an emulator, then from `mobile`:
+
+    flutter run
+    flutter run --dart-define=API_BASE=http://192.168.1.20:8000   # a real phone on the same Wi-Fi
+    flutter test
+
+Plain `http://` works in debug builds only; a release build needs an `https://` API.
+
+## Tests and load test
+    cd backend; ..\.venv\Scripts\python.exe -m pytest -q        # 72 tests
+    cd mobile;  flutter test                                         # 43 tests
+    cd backend; ..\.venv\Scripts\python.exe -m locust -f loadtest/locustfile.py --host http://127.0.0.1:8000 --headless -u 50 -r 10 -t 2m --csv ../docs/chapter4/loadtest/results

@@ -1,5 +1,8 @@
 """Run with:  cd backend  then  pytest -v
 Uses an in-memory SQLite database, so PostgreSQL is not needed for the tests."""
+import hashlib
+from datetime import datetime, timedelta, timezone
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, select
@@ -8,7 +11,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.database import Base, get_db
 from app.main import app
-from app.models import User
+from app.models import AuditLog, FinancialMetric, PasswordResetToken, Sacco, User
 from app.utils import normalize_name
 
 PW = "Str0ngPass1"
@@ -93,6 +96,72 @@ def test_login_wrong_password_and_unknown_email_same_message(client):
     assert r1.json() == r2.json()
 
 
+def test_forgot_password_uses_hashed_single_use_token(client, monkeypatch):
+    from app.routers import auth
+
+    sent = {}
+    monkeypatch.setattr(auth, "email_delivery_configured", lambda: True)
+    monkeypatch.setattr(
+        auth,
+        "send_password_reset_email",
+        lambda email, token: sent.update(email=email, token=token),
+    )
+    register(client, "member@example.com")
+
+    response = client.post("/auth/forgot-password", json={"email": "MEMBER@example.com"})
+    assert response.status_code == 202
+    assert "If the account exists" in response.json()["message"]
+    assert sent["email"] == "member@example.com"
+
+    with client.Session() as session:
+        reset = session.scalar(select(PasswordResetToken))
+        assert reset.token_hash == hashlib.sha256(sent["token"].encode()).hexdigest()
+        assert reset.token_hash != sent["token"]
+
+    reset_response = client.post(
+        "/auth/reset-password",
+        json={"token": sent["token"], "new_password": "NewStrongPass8"},
+    )
+    assert reset_response.status_code == 200
+    assert login(client, "member@example.com", "NewStrongPass8").status_code == 200
+    assert login(client, "member@example.com", PW).status_code == 401
+    assert client.post(
+        "/auth/reset-password",
+        json={"token": sent["token"], "new_password": "AnotherPass9"},
+    ).status_code == 400
+
+
+def test_forgot_password_requires_email_configuration(client, monkeypatch):
+    from app.routers import auth
+
+    monkeypatch.setattr(auth, "email_delivery_configured", lambda: False)
+    register(client, "member@example.com")
+    known = client.post("/auth/forgot-password", json={"email": "member@example.com"})
+    unknown = client.post("/auth/forgot-password", json={"email": "missing@example.com"})
+    assert known.status_code == unknown.status_code == 503
+    assert known.json() == unknown.json()
+
+
+def test_expired_password_reset_token_is_rejected(client):
+    raw_token = "a" * 43
+    register(client, "member@example.com")
+    with client.Session() as session:
+        user = session.scalar(select(User).where(User.email == "member@example.com"))
+        session.add(PasswordResetToken(
+            user_id=user.id,
+            token_hash=hashlib.sha256(raw_token.encode()).hexdigest(),
+            expires_at=datetime.now(timezone.utc) - timedelta(seconds=1),
+        ))
+        session.commit()
+
+    response = client.post(
+        "/auth/reset-password",
+        json={"token": raw_token, "new_password": "NewStrongPass8"},
+    )
+    assert response.status_code == 400
+    assert login(client, "member@example.com", PW).status_code == 200
+
+
 def test_protected_route_needs_token(client):
     assert client.get("/users/me").status_code == 401
     assert client.get("/users/me", headers={"Authorization": "Bearer garbage"}).status_code == 401
@@ -171,8 +240,62 @@ def test_admin_sacco_crud(client):
     assert client.get(f"/saccos/{sid}").json()["county"] == "Nairobi"
     assert client.get("/saccos", params={"q": "stim"}).json()[0]["name"] == "STIMA DT."
     assert client.put(f"/saccos/{sid}", json={"county": "Kiambu"}, headers=h).json()["county"] == "Kiambu"
+    client.post(f"/saccos/{sid}/metrics", json={"data_year": 2024, "cca": 15.0}, headers=h)
     assert client.delete(f"/saccos/{sid}", headers=h).status_code == 204
     assert client.get(f"/saccos/{sid}").status_code == 404
+    assert client.get("/saccos", params={"q": "stim"}).json() == []
+    assert client.get("/saccos/archived").status_code == 401
+    archived = client.get("/saccos/archived", headers=h)
+    assert archived.status_code == 200
+    assert archived.json()[0]["is_archived"] is True
+    with client.Session() as session:
+        assert session.get(Sacco, sid) is not None
+        assert session.query(FinancialMetric).filter_by(sacco_id=sid).count() == 1
+    restored = client.post(f"/saccos/{sid}/restore", headers=h)
+    assert restored.status_code == 200
+    assert restored.json()["is_archived"] is False
+    assert client.get(f"/saccos/{sid}").status_code == 200
+
+
+def test_timestamps_and_audit_history(client):
+    headers = admin_headers(client)
+    response = client.post(
+        "/saccos", json={"name": "AUDIT SACCO", "county": "Nairobi"}, headers=headers
+    )
+    sacco_id = response.json()["id"]
+    metric = client.post(
+        f"/saccos/{sacco_id}/metrics", json={"data_year": 2024}, headers=headers
+    ).json()
+
+    with client.Session() as session:
+        sacco = session.get(Sacco, sacco_id)
+        financial_metric = session.get(FinancialMetric, metric["id"])
+        assert sacco.created_at is not None and sacco.updated_at is not None
+        assert financial_metric.created_at is not None and financial_metric.updated_at is not None
+        creation = session.query(AuditLog).filter_by(
+            entity_type="Sacco", action="insert").one()
+        assert creation.actor_email == "admin@example.com"
+        assert creation.after_data["name"] == "AUDIT SACCO"
+
+    client.put(
+        f"/saccos/{sacco_id}", json={"county": "Kiambu"}, headers=headers
+    )
+    client.delete(f"/metrics/{metric['id']}", headers=headers)
+
+    with client.Session() as session:
+        sacco = session.get(Sacco, sacco_id)
+        changes = session.query(AuditLog).filter_by(
+            entity_type="Sacco", action="update").all()
+        update = next(log for log in changes if log.entity_key == {"id": sacco_id})
+        assert sacco.updated_at >= sacco.created_at
+        assert update.before_data["county"] == "Nairobi"
+        assert update.after_data["county"] == "Kiambu"
+        metric_delete = session.query(AuditLog).filter_by(
+            entity_type="FinancialMetric", action="delete").one()
+        assert metric_delete.before_data["data_year"] == 2024
+        user_create = session.query(AuditLog).filter_by(
+            entity_type="User", action="insert").one()
+        assert "password_hash" not in user_create.after_data
 
 
 # ---------- metrics CRUD ----------
@@ -193,14 +316,14 @@ def test_metrics_crud_and_duplicate_year(client):
     assert client.delete(f"/metrics/{mid}", headers=h).status_code == 204
 
 
-def test_deleting_sacco_removes_its_metrics(client):
+def test_archiving_sacco_preserves_its_metrics(client):
     h = admin_headers(client)
     sid = client.post("/saccos", json={"name": "TOWER"}, headers=h).json()["id"]
     client.post(f"/saccos/{sid}/metrics", json={"data_year": 2024}, headers=h)
-    client.delete(f"/saccos/{sid}", headers=h)
-    from app.models import FinancialMetric
+    assert client.delete(f"/saccos/{sid}", headers=h).status_code == 204
     with client.Session() as s:
-        assert s.scalars(select(FinancialMetric)).all() == []
+        assert s.get(Sacco, sid).is_archived is True
+        assert s.query(FinancialMetric).filter_by(sacco_id=sid).count() == 1
 
 
 # ---------- watchlists ----------
@@ -391,3 +514,30 @@ def test_county_import_only_fills_unique_empty_headquarters(client):
         assert db.scalar(select(Sacco).where(Sacco.name == "STIMA DT.")).county == "Nairobi"
         assert db.scalar(select(Sacco).where(Sacco.name == "AFYA")).county == "Nairobi"
         assert db.scalar(select(Sacco).where(Sacco.name == "ARDHI")).county is None
+
+
+def test_stability_rows_read_the_2022_layout_with_liquidity():
+    """The 2022 report adds a liquidity column between external borrowing and NPL."""
+    import pandas as pd
+    from app.etl import stability_rows
+
+    header = ["#", "Name", "2021", "2022", "2021", "2022", "2021", "2022", "2021", "2022",
+              "2021", "2022", "2021", "2022"]
+    stima = ["2", "STIMA DT.", "16.46%", "16.43%", "22.35%", "22.41%", "11.33%", "10.88%",
+             "0.14%", "0.53%", "58.27%", "72.39%", "3.29%", "4.15%"]
+    rows = stability_rows(pd.DataFrame([header, stima]), 2021, 2022)
+
+    assert len(rows) == 2                     # one row per year; the header is skipped
+    y2021, y2022 = rows
+    assert (y2021["data_year"], y2021["cca"], y2021["liquidity_ratio"], y2021["npl_ratio"]) == (2021, 16.46, 58.27, 3.29)
+    assert (y2022["data_year"], y2022["ext_borrowing"], y2022["liquidity_ratio"], y2022["npl_ratio"]) == (2022, 0.53, 72.39, 4.15)
+
+
+def test_stability_rows_read_the_12_column_layout_without_liquidity():
+    import pandas as pd
+    from app.etl import stability_rows
+
+    row = ["1", "STIMA DT.", "16.4%", "19.22%", "22.3%", "27.38%", "11.0%", "12.55%",
+           "0.5%", "1.14%", "4.2%", "6.53%"]
+    y2023, y2024 = stability_rows(pd.DataFrame([row]), 2023, 2024)
+    assert y2024["npl_ratio"] == 6.53 and "liquidity_ratio" not in y2024

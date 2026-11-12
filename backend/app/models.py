@@ -1,8 +1,8 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from sqlalchemy import (
-    Boolean, CheckConstraint, DateTime, Float, ForeignKey, Index, Integer,
+    Boolean, CheckConstraint, DateTime, Float, ForeignKey, Index, Integer, JSON,
     String, UniqueConstraint, func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -10,7 +10,18 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .database import Base
 
 
-class User(Base):
+class TimestampMixin:
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc),
+        server_default=func.now(), nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc), server_default=func.now(), nullable=False,
+    )
+
+
+class User(TimestampMixin, Base):
     __tablename__ = "users"
     __table_args__ = (CheckConstraint("role IN ('member','admin')", name="ck_users_role"),)
 
@@ -20,18 +31,30 @@ class User(Base):
     full_name: Mapped[str] = mapped_column(String(120))
     role: Mapped[str] = mapped_column(String(20), default="member")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-
     watchlists: Mapped[list["Watchlist"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan")
+    reset_tokens: Mapped[list["PasswordResetToken"]] = relationship(
         back_populates="user", cascade="all, delete-orphan")
 
 
-class Sacco(Base):
+class PasswordResetToken(TimestampMixin, Base):
+    __tablename__ = "password_reset_tokens"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    consumed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    user: Mapped["User"] = relationship(back_populates="reset_tokens")
+
+
+class Sacco(TimestampMixin, Base):
     __tablename__ = "saccos"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(200), unique=True, index=True)
     county: Mapped[Optional[str]] = mapped_column(String(80), nullable=True, index=True)
+    is_archived: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
 
     aliases: Mapped[list["SaccoAlias"]] = relationship(
         back_populates="sacco", cascade="all, delete-orphan")
@@ -41,7 +64,7 @@ class Sacco(Base):
         back_populates="sacco", cascade="all, delete-orphan")
 
 
-class SaccoAlias(Base):
+class SaccoAlias(TimestampMixin, Base):
     """Matching keys so one SACCO is recognised across differently-spelled reports."""
     __tablename__ = "sacco_aliases"
 
@@ -52,7 +75,7 @@ class SaccoAlias(Base):
     sacco: Mapped["Sacco"] = relationship(back_populates="aliases")
 
 
-class Report(Base):
+class Report(TimestampMixin, Base):
     """Which SASRA annual report a number came from (provenance)."""
     __tablename__ = "reports"
 
@@ -60,9 +83,10 @@ class Report(Base):
     report_year: Mapped[int] = mapped_column(Integer, unique=True)
     source_file: Mapped[Optional[str]] = mapped_column(String(200))
     units: Mapped[str] = mapped_column(String(40), default="Kshs billions")
+    metrics: Mapped[list["FinancialMetric"]] = relationship(back_populates="report")
 
 
-class FinancialMetric(Base):
+class FinancialMetric(TimestampMixin, Base):
     __tablename__ = "financial_metrics"
     __table_args__ = (
         UniqueConstraint("sacco_id", "data_year", name="uq_metric_sacco_year"),
@@ -95,9 +119,10 @@ class FinancialMetric(Base):
     source_page: Mapped[Optional[int]] = mapped_column(Integer)
 
     sacco: Mapped["Sacco"] = relationship(back_populates="metrics")
+    report: Mapped[Optional["Report"]] = relationship(back_populates="metrics")
 
 
-class PearlsScore(Base):
+class PearlsScore(TimestampMixin, Base):
     """Filled in Phase 3 by the scoring engine."""
     __tablename__ = "pearls_scores"
     __table_args__ = (
@@ -120,21 +145,19 @@ class PearlsScore(Base):
     sacco: Mapped["Sacco"] = relationship(back_populates="scores")
 
 
-class Watchlist(Base):
+class Watchlist(TimestampMixin, Base):
     __tablename__ = "watchlists"
     __table_args__ = (UniqueConstraint("user_id", "name", name="uq_watchlist_user_name"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     name: Mapped[str] = mapped_column(String(100))
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-
     user: Mapped["User"] = relationship(back_populates="watchlists")
     items: Mapped[list["WatchlistItem"]] = relationship(
         back_populates="watchlist", cascade="all, delete-orphan")
 
 
-class WatchlistItem(Base):
+class WatchlistItem(TimestampMixin, Base):
     __tablename__ = "watchlist_items"
 
     watchlist_id: Mapped[int] = mapped_column(
@@ -144,3 +167,19 @@ class WatchlistItem(Base):
 
     watchlist: Mapped["Watchlist"] = relationship(back_populates="items")
     sacco: Mapped["Sacco"] = relationship()
+
+
+class AuditLog(TimestampMixin, Base):
+    __tablename__ = "audit_logs"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    entity_type: Mapped[str] = mapped_column(String(100), index=True)
+    entity_key: Mapped[dict] = mapped_column(JSON)
+    action: Mapped[str] = mapped_column(String(16), index=True)
+    actor_user_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, index=True)
+    actor_email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    before_data: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    after_data: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+
+
+from . import audit as _audit
