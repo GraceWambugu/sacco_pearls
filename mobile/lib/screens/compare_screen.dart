@@ -366,8 +366,8 @@ class _ComparisonView extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               const _Note(
-                'Protection (P) and Liquidity (L) are not on the chart: SASRA does not publish '
-                'the figures they need for each SACCO, so they are not scored.',
+                'Scores and charts use E, A, R and S. Protection data is not published per SACCO; '
+                'reported liquidity appears on individual profiles when available, but is not scored.',
               ),
               if (missingGrowth.isNotEmpty)
                 _Note(
@@ -490,13 +490,6 @@ class _ComparisonTable extends StatelessWidget {
             _Line(label: _Label(row.label), cells: _cells(row)),
           ],
           const Divider(height: 16),
-          _Line(
-            label: const _Label('P · Protection\nL · Liquidity'),
-            cells: [
-              for (final _ in results)
-                const Text('Not available', textAlign: TextAlign.center, style: TextStyle(color: AppColors.muted, fontSize: 11)),
-            ],
-          ),
         ],
       ),
     );

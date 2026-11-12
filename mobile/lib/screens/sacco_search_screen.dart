@@ -142,7 +142,7 @@ class _SaccoSearchScreenState extends State<SaccoSearchScreen> {
     setState(() {
       _results = _load();
     });
-    if (_scores.isEmpty) _loadScores();
+    _loadScores();
   }
 
   /// Rating and NPL filters work on the scores we already have, so no extra API call.

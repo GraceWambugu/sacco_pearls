@@ -73,11 +73,12 @@ void main() {
     expect(find.text('Green rating'), findsNWidgets(3)); // the word, not only the colour
   });
 
-  testWidgets('the PEARLS guide says P and L are not scored and uses 75/50', (tester) async {
+  testWidgets('the PEARLS guide shows the scored dimensions and explains data limits', (tester) async {
     await pumpHome(tester);
 
     expect(find.text('Understanding the PEARLS framework'), findsOneWidget);
-    expect(find.text('Not scored'), findsNWidgets(2)); // Protection and Liquidity
+    expect(find.text('Not scored'), findsNothing);
+    expect(find.textContaining('This app scores E, A, R and S'), findsOneWidget);
     expect(find.text('75–100: Green'), findsOneWidget);
     expect(find.text('50–74.9: Amber'), findsOneWidget);
     expect(find.textContaining('Dividend'), findsNothing); // no invented dividend data

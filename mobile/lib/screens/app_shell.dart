@@ -72,7 +72,10 @@ class _AppShellState extends State<AppShell> {
         onOpenAccount: () => openAccount(context),
         onOpenSaved: _openSaved,
       ),
-      SaccoSearchScreen(rankingsLoader: () => _rankings, request: _directoryRequest),
+      // The Directory should fetch fresh rankings when opened or refreshed.
+      // Reusing the shell's Future could leave it stuck with a startup error
+      // if the API was unavailable when the app first launched.
+      SaccoSearchScreen(rankingsLoader: ApiService.getRankings, request: _directoryRequest),
       CompareScreen(onBrowse: () => _goTo(AppShell.searchTab)),
       TrendsScreen(rankings: _rankings),
     ];

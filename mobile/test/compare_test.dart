@@ -136,9 +136,9 @@ void main() {
       expect(chipWord('Green'), findsOneWidget);
       expect(chipWord('Amber'), findsOneWidget);
       expect(find.byType(RadarChart), findsOneWidget);
-      expect(find.textContaining('Protection (P) and Liquidity (L) are not on the chart'), findsOneWidget);
-      expect(find.text('P · Protection\nL · Liquidity'), findsOneWidget);
-      expect(find.text('Not available'), findsNWidgets(2)); // one cell per SACCO
+      expect(find.textContaining('Scores and charts use E, A, R and S'), findsOneWidget);
+      expect(find.text('Protection'), findsNothing);
+      expect(find.text('Liquidity'), findsNothing);
     });
 
     testWidgets('ties are shown as joint', (tester) async {

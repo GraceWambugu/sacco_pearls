@@ -115,28 +115,28 @@ void main() {
   });
 
   group('Profile screen', () {
-    testWidgets('shows the composite, the rating word and all six PEARLS rows', (tester) async {
+    testWidgets('shows the composite and only the four scored PEARLS rows', (tester) async {
       await pumpProfile(tester);
 
       expect(find.textContaining('85.0 /100', findRichText: true), findsOneWidget); // big number
       expect(find.text('Green rating'), findsOneWidget); // the word, not only the colour
       expect(find.textContaining('STIMA DT. is rated Green (85.0 out of 100) on 2024 figures'), findsOneWidget);
-      expect(find.text('4 OF 6 SCORED'), findsOneWidget);
-      for (final name in ['Protection', 'Effective financial structure', 'Asset quality',
-          'Rates of return and costs', 'Liquidity', 'Signs of growth']) {
+      expect(find.text('4 OF 4 SCORED'), findsOneWidget);
+      for (final name in ['Effective financial structure', 'Asset quality',
+          'Rates of return and costs', 'Signs of growth']) {
         expect(find.text(name), findsOneWidget);
       }
-      expect(find.text('Not available'), findsNWidgets(2)); // P and L
+      expect(find.text('REPORTED LIQUIDITY'), findsNothing); // absent for 2024
+      expect(
+        find.text('Protection is omitted because SASRA does not publish the required per-SACCO figures.'),
+        findsOneWidget,
+      );
       expect(find.text('50 · Amber'), findsOneWidget); // asset quality bar label
       expect(find.textContaining('not financial advice'), findsOneWidget);
     });
 
-    testWidgets('expanding a dimension shows the reason or the indicator rule', (tester) async {
+    testWidgets('expanding a scored dimension shows its indicator rule', (tester) async {
       await pumpProfile(tester);
-
-      await tester.tap(find.text('Protection'));
-      await tester.pumpAndSettle();
-      expect(find.textContaining('Why: Loan-loss provisions'), findsOneWidget);
 
       await tester.tap(find.text('Effective financial structure'));
       await tester.pumpAndSettle();
@@ -168,7 +168,7 @@ void main() {
     });
   });
 
-  testWidgets('a published liquidity ratio is shown but not scored', (tester) async {
+  testWidgets('a published liquidity ratio is separate from the score breakdown', (tester) async {
     final json = stimaJson();
     (json['dimensions'] as Map)['L'] = {
       'code': 'L', 'name': 'Liquidity', 'scored': false, 'score': null,
@@ -180,8 +180,11 @@ void main() {
     };
     await pumpProfile(tester, json: json);
 
-    expect(find.text('Shown, not scored · 72.4%'), findsOneWidget);
-    expect(find.text('Not available'), findsOneWidget); // only Protection now
-    expect(find.text('Info'), findsOneWidget); // ratios card: no band for liquidity
+    expect(find.text('REPORTED LIQUIDITY'), findsOneWidget);
+    expect(find.text('Liquidity ratio'), findsOneWidget);
+    expect(find.text('72.4%'), findsOneWidget);
+    expect(find.text('Shown, not scored · 72.4%'), findsNothing);
+    expect(find.text('Liquidity'), findsNothing); // no PEARLS breakdown row
+    expect(find.textContaining('not included in the score'), findsOneWidget);
   });
 }

@@ -210,29 +210,6 @@ class _Hero extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: AppColors.green.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(999),
-                      border: Border.all(color: AppColors.green.withValues(alpha: 0.25)),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.auto_awesome_rounded, size: 14, color: AppColors.highlight),
-                        SizedBox(width: 6),
-                        Flexible(
-                          child: Text(
-                            'PEARLS decision-support system',
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(color: AppColors.highlight, fontSize: 11, fontWeight: FontWeight.w700),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 14),
                   Text.rich(
                     TextSpan(
                       style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900, height: 1.2),
@@ -492,10 +469,20 @@ class _ActionTile extends StatelessWidget {
                     ),
                 ],
               ),
-              const SizedBox(height: 12),
-              Text(title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+              const SizedBox(height: 8),
+              Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+              ),
               const SizedBox(height: 2),
-              Text(detail, style: const TextStyle(color: AppColors.muted, fontSize: 11)),
+              Text(
+                detail,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: AppColors.muted, fontSize: 11),
+              ),
             ],
           ),
         ),
@@ -700,9 +687,6 @@ class _PearlsExplainer extends StatelessWidget {
   const _PearlsExplainer({super.key});
 
   static const _dimensions = [
-    _Dimension('P', 'Protection', 'Not scored', Color(0xFF34D399),
-        'Loan-loss provisions set aside against bad loans. SASRA does not publish them for each SACCO, '
-            'so this app cannot score Protection.'),
     _Dimension('E', 'Effective financial structure', 'SASRA min: 10% core capital', Color(0xFF60A5FA),
         'Core and institutional capital against assets and deposits, and external borrowing '
             '(at most 25% of assets). Green means comfortably above the SASRA limits.'),
@@ -712,9 +696,6 @@ class _PearlsExplainer extends StatelessWidget {
     _Dimension('R', 'Rates of return and costs', 'Compared with peers', Color(0xFFC084FC),
         'Total income against total assets, compared with the middle SACCO that year. '
             'A rough guide to returns, because SASRA does not publish surplus per SACCO.'),
-    _Dimension('L', 'Liquidity', 'Not scored', Color(0xFF2DD4BF),
-        'Cash available to pay out withdrawals. SASRA published a liquidity ratio per SACCO only in '
-            'its 2022 report, so it is shown where available but not scored.'),
     _Dimension('S', 'Signs of growth', 'Green: growth above inflation', Color(0xFFFB7185),
         'Year-on-year growth in assets, deposits and loans, compared with inflation. '
             'Needs the previous year, so the first year loaded has no growth score.'),
@@ -758,6 +739,12 @@ class _PearlsExplainer extends StatelessWidget {
             _DimensionCard(dimension: dimension),
             const SizedBox(height: 10),
           ],
+          const Text(
+            'This app scores E, A, R and S. Protection data is not published per SACCO. '
+            'Reported liquidity appears on profiles when available, but is left out of scores '
+            'to keep years comparable.',
+            style: TextStyle(color: AppColors.muted, fontSize: 12, height: 1.4),
+          ),
         ],
       ),
     );

@@ -17,7 +17,7 @@ typedef ScoreLoader = Future<SaccoScore> Function(int saccoId, {int? year});
 typedef TrendLoader = Future<List<TrendPoint>> Function(int saccoId);
 
 /// One SACCO's health profile: header with the score, a plain summary, the
-/// radar, every SASRA ratio used, the six PEARLS rows, notes and the disclaimer.
+/// radar, SASRA ratios, the four scored PEARLS dimensions, notes and disclaimer.
 class SaccoProfileScreen extends StatefulWidget {
   const SaccoProfileScreen({
     super.key,
@@ -168,17 +168,30 @@ class _SaccoProfileScreenState extends State<SaccoProfileScreen> {
                 _RadarCard(score: score),
                 const SizedBox(height: 16),
                 _RatiosCard(score: score),
+                if (_reportedLiquidity(score).isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  _ReportedLiquidityCard(indicators: _reportedLiquidity(score)),
+                ],
                 const SizedBox(height: 24),
                 _SectionTitle(
                   title: 'PEARLS breakdown',
-                  trailing: '${score.dimensionsScored} OF ${score.dimensionsTotal} SCORED',
+                  trailing: '${score.dimensionsScored} OF 4 SCORED',
                 ),
                 const Text(
-                  'Tap a row to see the figures and how each one is rated.',
+                  'The score uses E, A, R and S. Tap a row to see its figures and rating rules.',
                   style: TextStyle(color: AppColors.muted, fontSize: 13),
                 ),
                 const SizedBox(height: 6),
-                for (final dimension in score.dimensions.values) _DimensionRow(dimension: dimension),
+                for (final code in const ['E', 'A', 'R', 'S'])
+                  if (score.dimensions[code] != null)
+                    _DimensionRow(dimension: score.dimensions[code]!),
+                const Padding(
+                  padding: EdgeInsets.only(top: 8),
+                  child: Text(
+                    'Protection is omitted because SASRA does not publish the required per-SACCO figures.',
+                    style: TextStyle(color: AppColors.muted, fontSize: 12, height: 1.35),
+                  ),
+                ),
                 if (score.flags.isNotEmpty) ...[
                   const SizedBox(height: 16),
                   _Notice(
@@ -415,8 +428,8 @@ class _RadarCard extends StatelessWidget {
           ]),
           const SizedBox(height: 6),
           const Text(
-            'Further out is healthier. Protection (P) and Liquidity (L) are not on the chart because '
-            'SASRA does not publish the figures they need for each SACCO.',
+            'Further out is healthier. The chart uses the four dimensions included in the score. '
+            'Reported liquidity, when available, appears separately below.',
             style: TextStyle(color: AppColors.muted, fontSize: 12, height: 1.35),
           ),
         ],
@@ -434,7 +447,7 @@ class _RatiosCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final indicators = [
-      for (final code in const ['E', 'A', 'R', 'L', 'S']) ...?score.dimensions[code]?.indicators,
+      for (final code in const ['E', 'A', 'R', 'S']) ...?score.dimensions[code]?.indicators,
     ];
     return Panel(
       radius: 24,
@@ -476,6 +489,48 @@ class _RatiosCard extends StatelessWidget {
                       textAlign: TextAlign.right,
                       style: const TextStyle(color: AppColors.muted, fontSize: 11),
                     ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+List<PearlsIndicator> _reportedLiquidity(SaccoScore score) => [
+      for (final indicator in score.dimensions['L']?.indicators ?? const <PearlsIndicator>[])
+        if (indicator.value != null) indicator,
+    ];
+
+class _ReportedLiquidityCard extends StatelessWidget {
+  const _ReportedLiquidityCard({required this.indicators});
+
+  final List<PearlsIndicator> indicators;
+
+  @override
+  Widget build(BuildContext context) {
+    return Panel(
+      radius: 24,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _CardTitle('Reported liquidity'),
+          const SizedBox(height: 4),
+          const Text(
+            'Shown as published by SASRA; this figure is not included in the score.',
+            style: TextStyle(color: AppColors.muted, fontSize: 12, height: 1.35),
+          ),
+          for (final indicator in indicators)
+            Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: Row(
+                children: [
+                  Expanded(child: Text(indicator.label, style: const TextStyle(fontSize: 13))),
+                  Text(
+                    '${formatNumber(indicator.value!)}${indicator.unit ?? ''}',
+                    style: const TextStyle(fontWeight: FontWeight.w800),
                   ),
                 ],
               ),
@@ -697,8 +752,10 @@ class _Disclaimer extends StatelessWidget {
   Widget build(BuildContext context) {
     return const Text(
       'Ratings describe the figures SASRA published for this year. They do not predict '
-      'whether a SACCO will fail and are not financial advice. Protection and Liquidity are '
-      'not scored because SASRA does not publish the figures they need for each SACCO.',
+      'whether a SACCO will fail and are not financial advice. Scores use the four data-supported '
+      'dimensions E, A, R and S. Protection is omitted because SASRA does not publish the required '
+      'per-SACCO figures; liquidity is shown separately when available and is not scored for '
+      'year-to-year comparability.',
       style: TextStyle(color: AppColors.muted, fontSize: 12, height: 1.4),
     );
   }
